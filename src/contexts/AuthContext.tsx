@@ -146,7 +146,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateBalance = (newBalance: number) => {
     if (user) {
-      setUser({ ...user, balance: newBalance });
+      setUser({ 
+        ...user, 
+        balance: newBalance, // Update legacy balance for compatibility
+        usdcBalance: newBalance // Update USDC balance
+      });
     }
   };
 
