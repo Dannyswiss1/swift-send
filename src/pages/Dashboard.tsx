@@ -5,13 +5,15 @@ import { TransactionItem } from '@/components/TransactionItem';
 import { BottomNav } from '@/components/BottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { transactions } from '@/data/mockData';
-import { Send, Plus, Bell, ArrowRight } from 'lucide-react';
+import { Send, Plus, Bell, ArrowRight, Shield, Info } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const recentTransactions = transactions.slice(0, 3);
+  const isNewUser = user?.createdAt && 
+    new Date().getTime() - new Date(user.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000; // 7 days
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -33,6 +35,28 @@ export default function Dashboard() {
 
       <main className="px-6">
         <div className="max-w-lg mx-auto space-y-6">
+          {/* New User Welcome Message */}
+          {isNewUser && (
+            <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">
+                    Your personal wallet is ready! 
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Your funds are secure in your personal account. Add money to start sending globally.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => {}}>
+                    Add Funds to Start
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Balance Card */}
           <BalanceCard balance={user?.balance || 0} />
 
@@ -58,19 +82,31 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          {/* Transaction Stats */}
+          {/* Wallet Security Info */}
           <div className="bg-card rounded-xl p-4 shadow-card">
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-4 h-4 text-green-600" />
+              </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">$850</p>
+                <h3 className="font-semibold text-foreground text-sm">Your Personal Wallet</h3>
+                <p className="text-xs text-muted-foreground">
+                  Your money is safely stored in your personal account, protected by bank-grade security
+                </p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4 text-center pt-3 border-t border-border">
+              <div>
+                <p className="text-lg font-bold text-foreground">$850</p>
                 <p className="text-xs text-muted-foreground">Sent this month</p>
               </div>
               <div className="border-x border-border">
-                <p className="text-2xl font-bold text-success">$2.50</p>
+                <p className="text-lg font-bold text-success">$2.50</p>
                 <p className="text-xs text-muted-foreground">Fees saved</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">12</p>
+                <p className="text-lg font-bold text-foreground">12</p>
                 <p className="text-xs text-muted-foreground">Transfers</p>
               </div>
             </div>

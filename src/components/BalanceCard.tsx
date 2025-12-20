@@ -22,7 +22,7 @@ export function BalanceCard({ balance, className }: BalanceCardProps) {
           <div className="p-2 rounded-lg bg-primary-foreground/20">
             <Wallet className="w-5 h-5" />
           </div>
-          <span className="text-sm font-medium opacity-90">Available Balance</span>
+          <span className="text-sm font-medium opacity-90">Personal Wallet Balance</span>
         </div>
         <button
           onClick={() => setShowBalance(!showBalance)}
@@ -48,7 +48,7 @@ export function BalanceCard({ balance, className }: BalanceCardProps) {
 
       <div className="flex items-center gap-2 text-sm opacity-90">
         <TrendingUp className="w-4 h-4" />
-        <span>Powered by Stellar • Near-instant transfers</span>
+        <span>Secured in your personal account • Global transfers</span>
       </div>
     </div>
   );

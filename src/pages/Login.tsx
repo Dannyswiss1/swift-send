@@ -21,9 +21,13 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      await login(identifier);
-      toast.success('Welcome back!');
-      navigate('/dashboard');
+      const result = await login(identifier);
+      if (result.needsVerification) {
+        toast.success('Please check your email/phone for verification');
+      } else {
+        toast.success('Welcome back!');
+        navigate('/dashboard');
+      }
     } catch (error) {
       toast.error('Failed to sign in. Please try again.');
     } finally {
@@ -40,7 +44,7 @@ export default function Login() {
             <div className="w-10 h-10 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
               <Zap className="w-6 h-6" />
             </div>
-            <span className="text-xl font-bold">StellarPay</span>
+            <span className="text-xl font-bold">SwiftSend</span>
           </div>
 
           <h1 className="text-3xl font-bold mb-3 leading-tight">

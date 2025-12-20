@@ -6,6 +6,10 @@ export const currentUser: User = {
   phone: '+1 (555) 123-4567',
   email: 'maria.santos@email.com',
   balance: 1250.50,
+  isVerified: true,
+  onboardingCompleted: true,
+  walletAddress: 'wallet_maria_santos_123',
+  createdAt: new Date('2024-01-15'),
 };
 
 export const contacts: Contact[] = [

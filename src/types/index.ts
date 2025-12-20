@@ -4,6 +4,18 @@ export interface User {
   phone: string;
   email?: string;
   balance: number;
+  isVerified: boolean;
+  onboardingCompleted: boolean;
+  walletAddress?: string;
+  createdAt: Date;
+}
+
+export interface AuthUser {
+  id: string;
+  email?: string;
+  phone?: string;
+  isVerified: boolean;
+  hasWallet: boolean;
 }
 
 export interface Contact {
