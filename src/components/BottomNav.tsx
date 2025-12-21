@@ -1,10 +1,11 @@
-import { Home, Send, Clock, User } from 'lucide-react';
+import { Home, Send, MapPin, Clock, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { icon: Home, label: 'Home', path: '/dashboard' },
   { icon: Send, label: 'Send', path: '/send' },
+  { icon: MapPin, label: 'Track', path: '/remittance' },
   { icon: Clock, label: 'History', path: '/history' },
   { icon: User, label: 'Profile', path: '/profile' },
 ];

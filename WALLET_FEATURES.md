@@ -1,15 +1,43 @@
-# SwiftSend - Global Money Transfer App
+# SwiftSend - Complete Remittance Solution
 
-SwiftSend is a modern, user-friendly money transfer application built with React, TypeScript, and Tailwind CSS. It enables instant global money transfers on the Stellar network with both managed wallet and external wallet connectivity options.
+SwiftSend is a modern, user-friendly money transfer application built with React, TypeScript, and Tailwind CSS. It enables instant global money transfers on the Stellar network with complete end-to-end remittance services, from cash-in to cash-out.
 
 ## 🚀 Key Features
 
+### Complete Remittance Journey
+- **Cash-In Options**: Multiple ways for senders to add funds
+- **Instant Global Transfers**: Send money anywhere in the world in 3-5 seconds
+- **Cash-Out Network**: Comprehensive recipient access options
+- **Real-time Tracking**: Full visibility into transfer status
+- **Local Currency Conversion**: Automatic exchange to recipient's local currency
+
+### Cash-In Methods (Funding)
+- **Bank Transfer (ACH)**: Free transfers, 1-3 business days
+- **Debit Card**: Instant funding, competitive rates
+- **Cash Deposits**: Physical cash deposits at partner locations
+- **Mobile Money**: M-Pesa, MTN Money, and other mobile wallets
+- **Crypto Transfer**: Direct USDC transfers from external wallets
+
+### Cash-Out Network (Withdrawal)
+- **Cash Pickup**: 20,000+ locations across Mexico, Philippines, Guatemala, El Salvador
+- **Bank Transfers**: Direct deposits to local bank accounts
+- **Mobile Money**: GCash, M-Pesa, and other digital wallets  
+- **Home Delivery**: Cash delivery in select cities
+- **Digital Wallets**: Integration with local payment systems
+
+### Trusted Partner Network
+- **OXXO (Mexico)**: 20,000+ convenience store locations
+- **GCash (Philippines)**: 65M+ user mobile wallet
+- **UnionBank (Philippines)**: 300+ banking locations
+- **Banco Agrícola (El Salvador)**: 100+ branches
+- **Guatemala Express**: Home delivery service
+
 ### Core Functionality
-- **Instant Global Transfers**: Send USDC anywhere in the world in 3-5 seconds
 - **Competitive Fees**: Network fees as low as $0.01
 - **Multi-currency Support**: Built-in exchange rates and local currency display
 - **Contact Management**: Save and manage recipient contacts
 - **Transaction History**: Complete transaction tracking and history
+- **Remittance Tracking**: Real-time status updates for all transfers
 
 ### Wallet Options
 - **Managed Wallet**: Simple, user-friendly wallet managed by SwiftSend
@@ -26,9 +54,23 @@ SwiftSend is a modern, user-friendly money transfer application built with React
 - **End-to-end Encryption**: All sensitive data encrypted
 - **Regulated Operations**: Licensed money transmitter
 
-## 🌟 New: External Wallet Connectivity
+## 🌟 Complete Remittance Flow
 
-SwiftSend now supports connecting external Stellar wallets for power users who want enhanced transparency and control over their transactions.
+### For Senders
+1. **Add Funds**: Choose from multiple funding methods
+2. **Send Money**: Instant transfers on Stellar network
+3. **Track Status**: Real-time updates on transfer progress
+4. **Confirm Delivery**: Know when recipient receives money
+
+### For Recipients  
+1. **Get Notified**: Instant SMS/email with confirmation code
+2. **Choose Method**: Select preferred cash-out option
+3. **Access Money**: Pick up cash or receive digital transfer
+4. **Local Currency**: Receive money in local currency
+
+## 🌟 External Wallet Connectivity
+
+SwiftSend supports connecting external Stellar wallets for power users who want enhanced transparency and control over their transactions.
 
 ### Supported Wallets
 - **Freighter**: The most popular Stellar wallet browser extension

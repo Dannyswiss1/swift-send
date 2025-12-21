@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, Search, Filter, Calendar, Banknote, TrendingUp, Clock } from 'lucide-react';
+import { ChevronDown, Search, Filter, Calendar, Banknote, TrendingUp, Clock, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { TransactionItem } from '@/components/TransactionItem';
@@ -8,14 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useNavigate } from 'react-router-dom';
 
 const History: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
+
+  const handleGoBack = () => {
+    navigate(-1); // Go back to previous page
+  };
 
   // Calculate summary statistics
   const summary = useMemo(() => {
@@ -69,7 +75,18 @@ const History: React.FC = () => {
     <div className="max-w-md mx-auto bg-background min-h-screen pb-20">
       <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 border-b border-border/50">
         <div className="p-6 pb-4">
-          <h1 className="text-2xl font-bold text-foreground mb-6">Transaction History</h1>
+          {/* Header with back button */}
+          <div className="flex items-center gap-4 mb-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleGoBack}
+              className="p-2 h-auto"
+            >
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </Button>
+            <h1 className="text-2xl font-bold text-foreground">Transaction History</h1>
+          </div>
           
           {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-3 mb-4">

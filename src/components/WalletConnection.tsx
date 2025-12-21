@@ -81,6 +81,52 @@ export default function WalletConnectionDialog({ isOpen, onClose, onConnect }: W
             </ul>
           </div>
 
+          {/* Freighter Detection Status */}
+          {availableWallets.some(w => w.name === 'Freighter') && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-sm">
+                {typeof window !== 'undefined' && window.freighter ? (
+                  <span className="text-green-700">
+                    ✅ <strong>Freighter API Ready!</strong> Click "Unlock Wallet" to connect.
+                  </span>
+                ) : (
+                  <div className="space-y-2">
+                    <span className="text-orange-700">
+                      🔍 <strong>Looking for Freighter...</strong> 
+                      {localStorage.getItem('freighter-installed') === 'true' && (
+                        <span className="block mt-1">Extension detected, waiting for API to load...</span>
+                      )}
+                    </span>
+                    <div className="text-xs text-gray-600">
+                      <p><strong>If Freighter is installed but not detected:</strong></p>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        <li>
+                          <button 
+                            onClick={() => window.location.reload()}
+                            className="text-blue-600 underline hover:text-blue-800"
+                          >
+                            Refresh this page (Ctrl+F5)
+                          </button>
+                        </li>
+                        <li>Check if Freighter is enabled in chrome://extensions</li>
+                        <li>Try disabling and re-enabling Freighter</li>
+                        <li>Make sure you're using the latest version from{' '}
+                          <button 
+                            onClick={() => window.open('https://freighter.app/', '_blank')}
+                            className="text-blue-600 underline hover:text-blue-800"
+                          >
+                            freighter.app
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Available Wallets */}
           <div className="space-y-2">
             <h4 className="font-medium text-sm">Available Wallets</h4>
@@ -88,13 +134,17 @@ export default function WalletConnectionDialog({ isOpen, onClose, onConnect }: W
             {availableWallets.map((wallet) => {
               const provider = getProviderFromName(wallet.name);
               const isLoading = isConnecting && selectedWallet === provider;
+              const isDemoWallet = wallet.name === 'Demo Wallet';
+              const isFreighter = wallet.name === 'Freighter';
               
               return (
                 <div
                   key={wallet.name}
                   className={cn(
                     "p-3 border rounded-lg transition-colors cursor-pointer hover:border-primary/50",
-                    !wallet.isInstalled && "opacity-60 cursor-not-allowed"
+                    !wallet.isInstalled && "opacity-60 cursor-not-allowed",
+                    isDemoWallet && "border-yellow-300 bg-yellow-50",
+                    isFreighter && wallet.isInstalled && "border-green-300 bg-green-50"
                   )}
                   onClick={() => wallet.isInstalled && handleWalletConnect(provider)}
                 >
@@ -106,10 +156,14 @@ export default function WalletConnectionDialog({ isOpen, onClose, onConnect }: W
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-sm">{wallet.name}</p>
-                          {wallet.isInstalled ? (
-                            <Badge variant="success" className="text-xs">
+                          {isDemoWallet ? (
+                            <Badge variant="outline" className="text-xs border-yellow-400 text-yellow-700">
+                              🧪 Demo Only
+                            </Badge>
+                          ) : wallet.isInstalled ? (
+                            <Badge variant="default" className="text-xs bg-green-600">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Installed
+                              Real Wallet
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">
@@ -127,15 +181,21 @@ export default function WalletConnectionDialog({ isOpen, onClose, onConnect }: W
                     {wallet.isInstalled ? (
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant={isDemoWallet ? "outline" : "default"}
                         disabled={isLoading}
-                        className="ml-2"
+                        className={cn(
+                          "ml-2",
+                          isDemoWallet && "border-yellow-400 text-yellow-700",
+                          isFreighter && "bg-green-600 hover:bg-green-700"
+                        )}
                       >
                         {isLoading ? (
-                          <span className="animate-pulse">Connecting...</span>
+                          <span className="animate-pulse">
+                            {isFreighter ? 'Unlocking...' : 'Connecting...'}
+                          </span>
                         ) : (
                           <>
-                            Connect
+                            {isFreighter ? 'Unlock Wallet' : isDemoWallet ? 'Try Demo' : 'Connect'}
                             <ArrowRight className="w-4 h-4" />
                           </>
                         )}
@@ -211,7 +271,7 @@ export function WalletStatusIndicator() {
 
 // Quick wallet balance component
 export function WalletBalanceCard() {
-  const { connectionState, refreshBalance } = useWallet();
+  const { connectionState, refreshBalance, disconnectWallet } = useWallet();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   if (!connectionState.isConnected || !connectionState.account) {
@@ -225,11 +285,28 @@ export function WalletBalanceCard() {
   };
 
   return (
-    <div className="p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+    <div className={cn(
+      "p-4 border rounded-lg bg-gradient-to-br",
+      connectionState.account?.isReal 
+        ? "from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200"
+        : "from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200"
+    )}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-blue-600" />
-          <span className="text-sm font-medium">External Wallet</span>
+          <div className={cn(
+            "flex items-center gap-2",
+            connectionState.account?.isReal ? "text-green-600" : "text-yellow-600"
+          )}>
+            <Wallet className="w-4 h-4" />
+            <span className="text-sm font-medium">
+              {connectionState.account?.isReal ? 'Real Wallet Connected' : 'Demo Wallet'}
+            </span>
+            {connectionState.account?.isReal ? (
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-yellow-500" />
+            )}
+          </div>
         </div>
         <Button
           variant="ghost"
@@ -241,9 +318,20 @@ export function WalletBalanceCard() {
         </Button>
       </div>
       
+      {!connectionState.account?.isReal && (
+        <div className="mb-3 p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded border border-yellow-300">
+          <p className="text-xs text-yellow-800 dark:text-yellow-200">
+            🧪 This is a demonstration wallet. No real transactions will be made.
+          </p>
+        </div>
+      )}
+      
       <div className="space-y-1">
         <p className="text-2xl font-bold text-foreground">
           ${connectionState.account.balance.toFixed(2)}
+          {!connectionState.account?.isReal && (
+            <span className="text-sm font-normal text-yellow-600 ml-2">(Demo)</span>
+          )}
         </p>
         <p className="text-xs text-muted-foreground">
           {connectionState.account.publicKey.slice(0, 8)}...
@@ -251,15 +339,32 @@ export function WalletBalanceCard() {
         </p>
       </div>
       
-      <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1">
-          <Shield className="w-3 h-3" />
-          <span>Self-custody</span>
+      <div className="mt-3 flex items-center justify-between">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Shield className="w-3 h-3" />
+            <span>{connectionState.account?.isReal ? 'Real Self-custody' : 'Demo Mode'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Globe className="w-3 h-3" />
+            <span>Stellar Network</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Globe className="w-3 h-3" />
-          <span>Stellar Network</span>
-        </div>
+        
+        {/* Disconnect Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const walletType = connectionState.account?.isReal ? 'real wallet' : 'demo wallet';
+            if (window.confirm(`Are you sure you want to disconnect your ${walletType}?`)) {
+              disconnectWallet();
+            }
+          }}
+          className="text-xs px-3 py-1 h-auto"
+        >
+          Disconnect
+        </Button>
       </div>
     </div>
   );

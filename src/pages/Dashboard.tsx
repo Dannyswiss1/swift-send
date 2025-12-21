@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { BalanceCard } from '@/components/BalanceCard';
 import { TransactionItem } from '@/components/TransactionItem';
 import { BottomNav } from '@/components/BottomNav';
@@ -9,7 +10,7 @@ import { WalletTransactionHistory } from '@/components/TransactionSigning';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { transactions } from '@/data/mockData';
-import { Send, Plus, Bell, ArrowRight, Shield, Info, Zap, Clock, TrendingDown, Star, CheckCircle2, Globe2, Award, Wallet, ExternalLink } from 'lucide-react';
+import { Send, Plus, Bell, ArrowRight, Shield, Info, Zap, Clock, TrendingDown, Star, CheckCircle2, Globe2, Award, Wallet, ExternalLink, MapPin } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -96,6 +97,51 @@ export default function Dashboard() {
             localCurrency={user?.localCurrency || 'USD'}
             exchangeRate={user?.exchangeRate || 1.0}
           />
+
+          {/* How It Works - Brief Overview */}
+          {isNewUser && (
+            <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-indigo-600" />
+                  <h3 className="font-semibold text-indigo-900 dark:text-indigo-100">
+                    Complete Remittance Solution
+                  </h3>
+                </div>
+                <p className="text-sm text-indigo-700 dark:text-indigo-200 mb-4">
+                  We handle the entire journey - from adding cash to your account to cash pickup by your recipient.
+                </p>
+                <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                  <div>
+                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mx-auto mb-1">
+                      <Plus className="w-3 h-3 text-indigo-600" />
+                    </div>
+                    <p className="font-medium text-indigo-900 dark:text-indigo-100">Add Cash</p>
+                  </div>
+                  <div>
+                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mx-auto mb-1">
+                      <Zap className="w-3 h-3 text-indigo-600" />
+                    </div>
+                    <p className="font-medium text-indigo-900 dark:text-indigo-100">Send Fast</p>
+                  </div>
+                  <div>
+                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mx-auto mb-1">
+                      <MapPin className="w-3 h-3 text-indigo-600" />
+                    </div>
+                    <p className="font-medium text-indigo-900 dark:text-indigo-100">Cash Pickup</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-3 border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                  onClick={() => navigate('/remittance')}
+                >
+                  Learn How It Works
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* External Wallet Section */}
           {connectionState.isConnected ? (
@@ -184,7 +230,7 @@ export default function Dashboard() {
                 variant="secondary"
                 size="lg"
                 className="h-14"
-                onClick={() => {}}
+                onClick={() => navigate('/add-funds')}
               >
                 <Plus className="w-5 h-5" />
                 Add Funds
@@ -193,13 +239,57 @@ export default function Dashboard() {
                 variant="outline"
                 size="lg"
                 className="h-14"
-                onClick={() => navigate('/history')}
+                onClick={() => navigate('/withdraw')}
               >
-                <Clock className="w-5 h-5" />
-                View History
+                <ArrowRight className="w-5 h-5" />
+                Cash Out
               </Button>
             </div>
+            
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => navigate('/history')}
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              View Transaction History
+            </Button>
           </div>
+
+          {/* Quick Remittance Options */}
+          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800">
+            <CardContent className="p-4">
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                Complete Remittance Solution
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-200 mb-4">
+                From cash to cash - we handle the entire journey for your recipients
+              </p>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mx-auto mb-2">
+                    <Plus className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <p className="text-xs font-medium text-blue-900 dark:text-blue-100">Add Cash</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">Bank, Card, or Cash</p>
+                </div>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mx-auto mb-2">
+                    <Zap className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <p className="text-xs font-medium text-blue-900 dark:text-blue-100">Send Fast</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">Stellar Network</p>
+                </div>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mx-auto mb-2">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <p className="text-xs font-medium text-blue-900 dark:text-blue-100">Cash Pickup</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">20,000+ Locations</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Quick Stats */}
           <div className="bg-card rounded-xl p-4 shadow-card">

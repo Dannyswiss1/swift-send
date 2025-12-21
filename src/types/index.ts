@@ -70,6 +70,7 @@ export interface StellarAccount {
   balance: number;
   provider: string;
   isTestnet?: boolean;
+  isReal?: boolean; // Flag to distinguish real wallet connections from demo
 }
 
 export interface WalletTransaction {
@@ -96,6 +97,111 @@ export interface TransactionPreview {
 }
 
 export type WalletProvider = 'freighter' | 'albedo' | 'walletconnect' | 'rabet' | 'internal';
+
+// Funding and Withdrawal Types
+export interface FundingMethod {
+  id: string;
+  type: 'bank_transfer' | 'card' | 'cash_deposit' | 'mobile_money' | 'crypto_transfer';
+  name: string;
+  description: string;
+  icon: string;
+  processingTime: string;
+  fees: {
+    percentage?: number;
+    fixed?: number;
+    min?: number;
+    max?: number;
+  };
+  limits: {
+    min: number;
+    max: number;
+    dailyLimit: number;
+  };
+  regions: string[];
+  status: 'available' | 'maintenance' | 'unavailable';
+  instructions?: string[];
+}
+
+export interface WithdrawalMethod {
+  id: string;
+  type: 'cash_pickup' | 'bank_transfer' | 'mobile_money' | 'home_delivery' | 'digital_wallet';
+  name: string;
+  description: string;
+  icon: string;
+  processingTime: string;
+  fees: {
+    percentage?: number;
+    fixed?: number;
+  };
+  limits: {
+    min: number;
+    max: number;
+  };
+  availability: {
+    countries: string[];
+    cities?: string[];
+    operatingHours?: string;
+  };
+  partnerName: string;
+  partnerLogo?: string;
+  locations?: PickupLocation[];
+  requirements: string[];
+}
+
+export interface PickupLocation {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  hours: string;
+  phone?: string;
+  coordinates?: { lat: number; lng: number };
+  distance?: string;
+}
+
+export interface RemittanceFlow {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  amount: number;
+  fundingMethodId: string;
+  withdrawalMethodId: string;
+  status: 'funding' | 'processing' | 'ready_for_pickup' | 'completed' | 'cancelled';
+  timeline: RemittanceTimeline[];
+  estimatedCompletion: Date;
+  confirmationCode: string;
+  fees: {
+    funding: number;
+    exchange: number;
+    withdrawal: number;
+    total: number;
+  };
+  exchangeRate: number;
+  recipientAmount: number;
+  recipientCurrency: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RemittanceTimeline {
+  stage: 'initiated' | 'funded' | 'processing' | 'ready' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  timestamp?: Date;
+  estimatedTime?: string;
+  description: string;
+}
+
+export interface Partner {
+  id: string;
+  name: string;
+  type: 'bank' | 'money_transfer' | 'mobile_money' | 'cash_network';
+  logo: string;
+  description: string;
+  countries: string[];
+  services: ('cash_in' | 'cash_out')[];
+  reliability: number; // 0-1 rating
+  avgProcessingTime: string;
+}
 
 export interface WalletConnectionState {
   isConnected: boolean;

@@ -8,6 +8,10 @@ import { WalletProvider } from "./contexts/WalletContext";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import SendMoney from "./pages/SendMoney";
+import AddFunds from "./pages/AddFunds";
+import Withdraw from "./pages/Withdraw";
+import RemittanceStatus from "./pages/RemittanceStatus";
+import CashOutOptions from "./pages/CashOutOptions";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -41,6 +45,38 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SendMoney />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/add-funds"
+        element={
+          <ProtectedRoute>
+            <AddFunds />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/withdraw"
+        element={
+          <ProtectedRoute>
+            <Withdraw />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/remittance"
+        element={
+          <ProtectedRoute>
+            <RemittanceStatus />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cash-out"
+        element={
+          <ProtectedRoute>
+            <CashOutOptions />
           </ProtectedRoute>
         }
       />

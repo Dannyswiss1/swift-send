@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { contacts, calculateFees } from '@/data/mockData';
 import { Contact, TransactionPreview } from '@/types';
-import { ArrowLeft, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Clock, Wallet } from 'lucide-react';
+import { ArrowLeft, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Clock, Wallet, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'success';
@@ -179,21 +179,54 @@ export default function SendMoney() {
             {selectedContact?.name || newRecipient?.name || 'Recipient'}
           </p>
 
-          <div className="bg-card rounded-xl p-4 shadow-card mb-8">
-            <div className="flex items-center justify-between text-sm">
+          <div className="bg-card rounded-xl p-4 shadow-card mb-6">
+            <div className="flex items-center justify-between text-sm mb-3">
               <span className="text-muted-foreground">Estimated arrival</span>
               <span className="font-semibold text-success">~5 seconds</span>
             </div>
+            <div className="text-xs text-muted-foreground">
+              Your money is now on the Stellar network. The recipient can access it through various cash-out methods.
+            </div>
           </div>
 
-          <Button
-            variant="hero"
-            size="lg"
-            className="w-full"
-            onClick={() => navigate('/dashboard')}
-          >
-            Back to Home
-          </Button>
+          {/* Cash-out options for recipient */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin className="w-4 h-4 text-blue-600" />
+              <h3 className="font-medium text-blue-900 dark:text-blue-100">
+                Cash Pickup Available
+              </h3>
+            </div>
+            <p className="text-sm text-blue-700 dark:text-blue-200 mb-3">
+              {selectedContact?.name || 'Recipient'} can pick up cash at thousands of locations in {selectedContact?.country || 'their country'}.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
+              onClick={() => navigate(`/withdraw?recipient=${selectedContact?.id}`)}
+            >
+              Set Up Cash Pickup
+            </Button>
+          </div>
+
+          <div className="space-y-2 mb-8">
+            <Button
+              variant="hero"
+              size="lg"
+              className="w-full"
+              onClick={() => navigate('/dashboard')}
+            >
+              Back to Home
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => navigate('/history')}
+            >
+              View Transaction History
+            </Button>
+          </div>
         </div>
       </div>
     );
