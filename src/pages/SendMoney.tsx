@@ -5,10 +5,13 @@ import { Input } from '@/components/ui/input';
 import { ContactItem } from '@/components/ContactItem';
 import { FeeBreakdown } from '@/components/FeeBreakdown';
 import { BottomNav } from '@/components/BottomNav';
+import TransactionSigningDialog from '@/components/TransactionSigning';
+import { WalletStatusIndicator } from '@/components/WalletConnection';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWallet } from '@/contexts/WalletContext';
 import { contacts, calculateFees } from '@/data/mockData';
-import { Contact } from '@/types';
-import { ArrowLeft, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Clock } from 'lucide-react';
+import { Contact, TransactionPreview } from '@/types';
+import { ArrowLeft, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Clock, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'success';
@@ -23,6 +26,7 @@ interface NewRecipient {
 export default function SendMoney() {
   const navigate = useNavigate();
   const { user, updateBalance } = useAuth();
+  const { connectionState } = useWallet();
   const [step, setStep] = useState<Step>('recipient');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [newRecipient, setNewRecipient] = useState<NewRecipient | null>(null);
@@ -31,6 +35,9 @@ export default function SendMoney() {
   const [amount, setAmount] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showWalletSigning, setShowWalletSigning] = useState(false);
+  const [transactionPreview, setTransactionPreview] = useState<TransactionPreview | null>(null);
+  const [useExternalWallet, setUseExternalWallet] = useState(false);
 
   const filteredContacts = contacts.filter(
     (contact) =>
@@ -92,6 +99,23 @@ export default function SendMoney() {
   };
 
   const handleConfirmSend = async () => {
+    // Check if user wants to use external wallet
+    if (connectionState.isConnected && useExternalWallet) {
+      // Prepare transaction for external wallet signing
+      const destinationAddress = selectedContact?.phone || newRecipient?.identifier || '';
+      setTransactionPreview({
+        amount: amount,
+        asset: 'USDC',
+        destination: `stellar:${destinationAddress}`, // Mock stellar address conversion
+        memo: `SwiftSend transfer to ${selectedContact?.name || newRecipient?.name || 'recipient'}`,
+        networkFee: '0.00001',
+        estimatedTime: '3-5 seconds'
+      });
+      setShowWalletSigning(true);
+      return;
+    }
+
+    // Standard managed wallet transaction
     setIsProcessing(true);
     
     // Simulate blockchain transaction
@@ -102,6 +126,30 @@ export default function SendMoney() {
     
     setIsProcessing(false);
     setStep('success');
+    
+    toast.success('Transfer completed successfully!');
+  };
+
+  const handleWalletTransactionSuccess = (txHash: string) => {
+    setShowWalletSigning(false);
+    setIsProcessing(false);
+    setStep('success');
+    
+    toast.success('Transfer completed with external wallet!', {
+      description: `Transaction hash: ${txHash.slice(0, 8)}...`,
+      action: {
+        label: 'View Explorer',
+        onClick: () => window.open(`https://stellar.expert/explorer/public/tx/${txHash}`, '_blank')
+      }
+    });
+  };
+
+  const handleWalletTransactionError = (error: string) => {
+    setShowWalletSigning(false);
+    setIsProcessing(false);
+    toast.error('Transaction failed', {
+      description: error
+    });
   };
 
   const handleBack = () => {
@@ -482,6 +530,73 @@ export default function SendMoney() {
                 </div>
               </div>
 
+              {/* Wallet Selection */}
+              {connectionState.isConnected && (
+                <div className="space-y-3">
+                  <h3 className="font-medium text-foreground">Choose your payment method</h3>
+                  
+                  <div className="space-y-2">
+                    {/* SwiftSend Wallet Option */}
+                    <button
+                      className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                        !useExternalWallet 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => setUseExternalWallet(false)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Shield className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">SwiftSend Wallet</p>
+                            <p className="text-xs text-muted-foreground">Simple and fast</p>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 ${
+                          !useExternalWallet 
+                            ? 'border-primary bg-primary' 
+                            : 'border-border'
+                        }`}>
+                          {!useExternalWallet && <div className="w-2 h-2 bg-white rounded-full mx-auto mt-0.5"></div>}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* External Wallet Option */}
+                    <button
+                      className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                        useExternalWallet 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => setUseExternalWallet(true)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                            <Wallet className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">{connectionState.provider} Wallet</p>
+                            <p className="text-xs text-muted-foreground">Enhanced transparency</p>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 ${
+                          useExternalWallet 
+                            ? 'border-primary bg-primary' 
+                            : 'border-border'
+                        }`}>
+                          {useExternalWallet && <div className="w-2 h-2 bg-white rounded-full mx-auto mt-0.5"></div>}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Final CTA */}
               <Button
                 variant="hero"
@@ -512,6 +627,17 @@ export default function SendMoney() {
       </main>
 
       <BottomNav />
+
+      {/* Transaction Signing Dialog */}
+      {transactionPreview && (
+        <TransactionSigningDialog
+          isOpen={showWalletSigning}
+          onClose={() => setShowWalletSigning(false)}
+          transaction={transactionPreview}
+          onSuccess={handleWalletTransactionSuccess}
+          onError={handleWalletTransactionError}
+        />
+      )}
     </div>
   );
 }

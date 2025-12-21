@@ -1,15 +1,21 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { BalanceCard } from '@/components/BalanceCard';
 import { TransactionItem } from '@/components/TransactionItem';
 import { BottomNav } from '@/components/BottomNav';
+import WalletConnectionDialog, { WalletStatusIndicator, WalletBalanceCard } from '@/components/WalletConnection';
+import { WalletTransactionHistory } from '@/components/TransactionSigning';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWallet } from '@/contexts/WalletContext';
 import { transactions } from '@/data/mockData';
-import { Send, Plus, Bell, ArrowRight, Shield, Info, Zap, Clock, TrendingDown, Star, CheckCircle2, Globe2, Award } from 'lucide-react';
+import { Send, Plus, Bell, ArrowRight, Shield, Info, Zap, Clock, TrendingDown, Star, CheckCircle2, Globe2, Award, Wallet, ExternalLink } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { connectionState } = useWallet();
+  const [showWalletDialog, setShowWalletDialog] = useState(false);
 
   const recentTransactions = transactions.slice(0, 3);
   const isNewUser = user?.createdAt && 
@@ -27,6 +33,7 @@ export default function Dashboard() {
                 <CheckCircle2 className="w-3 h-3 text-green-600" />
                 <span className="text-xs font-medium text-green-800 dark:text-green-200">Verified</span>
               </div>
+              <WalletStatusIndicator />
             </div>
             <h1 className="text-xl font-bold text-foreground mb-1">
               {user?.name?.split(' ')[0] || 'User'}
@@ -89,6 +96,45 @@ export default function Dashboard() {
             localCurrency={user?.localCurrency || 'USD'}
             exchangeRate={user?.exchangeRate || 1.0}
           />
+
+          {/* External Wallet Section */}
+          {connectionState.isConnected ? (
+            <WalletBalanceCard />
+          ) : (
+            <div className="p-4 border border-dashed border-primary/30 rounded-xl bg-primary/5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Wallet className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-foreground mb-1">
+                    Connect Your Stellar Wallet
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    For advanced users who want full control over their private keys and enhanced transparency.
+                  </p>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+                    <div className="flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-green-500" />
+                      <span>Self-custody</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <ExternalLink className="w-3 h-3 text-blue-500" />
+                      <span>On-chain visibility</span>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowWalletDialog(true)}
+                  >
+                    <Wallet className="w-4 h-4" />
+                    Connect Wallet
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Stellar Network Status */}
           <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900/50 dark:to-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
@@ -239,10 +285,24 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Wallet Transaction History */}
+          {connectionState.isConnected && (
+            <WalletTransactionHistory />
+          )}
         </div>
       </main>
 
       <BottomNav />
+
+      {/* Wallet Connection Dialog */}
+      <WalletConnectionDialog
+        isOpen={showWalletDialog}
+        onClose={() => setShowWalletDialog(false)}
+        onConnect={() => {
+          // Optionally show success message or update UI
+        }}
+      />
     </div>
   );
 }

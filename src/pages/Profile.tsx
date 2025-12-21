@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
+import WalletConnectionDialog, { WalletStatusIndicator } from '@/components/WalletConnection';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWallet } from '@/contexts/WalletContext';
 import {
   User,
   Phone,
@@ -12,12 +15,16 @@ import {
   LogOut,
   ChevronRight,
   Wallet,
+  ExternalLink,
+  Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { connectionState, disconnectWallet } = useWallet();
+  const [showWalletDialog, setShowWalletDialog] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -25,8 +32,20 @@ export default function Profile() {
     navigate('/');
   };
 
+  const handleWalletDisconnect = () => {
+    disconnectWallet();
+    toast.success('External wallet disconnected');
+  };
+
   const menuItems = [
-    { icon: Wallet, label: 'Wallet Settings', onClick: () => {} },
+    { 
+      icon: Wallet, 
+      label: 'Wallet Settings', 
+      onClick: () => {},
+      rightContent: connectionState.isConnected ? (
+        <WalletStatusIndicator />
+      ) : null
+    },
     { icon: Shield, label: 'Security', onClick: () => {} },
     { icon: Bell, label: 'Notifications', onClick: () => {} },
     { icon: HelpCircle, label: 'Help & Support', onClick: () => {} },
@@ -82,12 +101,95 @@ export default function Profile() {
             </div>
           </div>
 
+          {/* Wallet Management Section */}
+          <div className="bg-card rounded-2xl p-5 shadow-soft animate-slide-up" style={{ animationDelay: '75ms' }}>
+            <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+              <Wallet className="w-5 h-5" />
+              Wallet Management
+            </h2>
+            
+            {connectionState.isConnected ? (
+              <div className="space-y-4">
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {connectionState.provider} Connected
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleWalletDisconnect}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                  <p className="text-sm text-green-600 dark:text-green-300 font-mono">
+                    {connectionState.account?.publicKey.slice(0, 8)}...{connectionState.account?.publicKey.slice(-8)}
+                  </p>
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-sm text-green-700 dark:text-green-300">Balance</span>
+                    <span className="font-semibold text-green-800 dark:text-green-200">
+                      ${connectionState.account?.balance.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`https://stellar.expert/explorer/public/account/${connectionState.account?.publicKey}`, '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View on Explorer
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {}}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Wallet Settings
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Connect your own Stellar wallet for enhanced control and transparency over your transactions.
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-green-500" />
+                    <span>Self-custody</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <ExternalLink className="w-3 h-3 text-blue-500" />
+                    <span>On-chain visibility</span>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowWalletDialog(true)}
+                >
+                  <Wallet className="w-4 h-4" />
+                  Connect External Wallet
+                </Button>
+              </div>
+            )}
+          </div>
+
           {/* Menu Items */}
           <div
             className="bg-card rounded-2xl shadow-soft overflow-hidden animate-slide-up"
             style={{ animationDelay: '100ms' }}
           >
-            {menuItems.map(({ icon: Icon, label, onClick }, index) => (
+            {menuItems.map(({ icon: Icon, label, onClick, rightContent }, index) => (
               <button
                 key={label}
                 onClick={onClick}
@@ -99,7 +201,10 @@ export default function Profile() {
                   </div>
                   <span className="font-medium text-foreground">{label}</span>
                 </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  {rightContent}
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </div>
               </button>
             ))}
           </div>
@@ -117,12 +222,21 @@ export default function Profile() {
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            StellarPay v1.0.0 • Powered by Stellar
+            SwiftSend v1.0.0 • Powered by Stellar
           </p>
         </div>
       </main>
 
       <BottomNav />
+
+      {/* Wallet Connection Dialog */}
+      <WalletConnectionDialog
+        isOpen={showWalletDialog}
+        onClose={() => setShowWalletDialog(false)}
+        onConnect={() => {
+          toast.success('Wallet connected successfully!');
+        }}
+      />
     </div>
   );
 }

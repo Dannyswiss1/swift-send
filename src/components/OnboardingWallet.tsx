@@ -192,6 +192,7 @@ export default function OnboardingWallet() {
               <li>• You can add money using bank transfers or cards</li>
               <li>• Start sending money to friends and family globally</li>
               <li>• Track all your transactions in one place</li>
+              <li>• Later, connect your own Stellar wallet for advanced features</li>
             </ul>
           </div>
 
@@ -206,8 +207,12 @@ export default function OnboardingWallet() {
           </Button>
 
           <div className="mt-4 text-center">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mb-3">
               By creating your wallet, you agree to our security and privacy terms
+            </p>
+            <p className="text-xs text-muted-foreground">
+              💡 <strong>Advanced users:</strong> You can connect your own Stellar wallet 
+              later from Settings for enhanced control and transparency.
             </p>
           </div>
         </div>

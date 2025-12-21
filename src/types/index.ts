@@ -11,6 +11,10 @@ export interface User {
   onboardingCompleted: boolean;
   walletAddress?: string;
   createdAt: Date;
+  // Stellar wallet preferences
+  externalWalletConnected?: boolean;
+  preferExternalWallet?: boolean;
+  walletConnectionStatus?: 'none' | 'connected' | 'disconnected';
 }
 
 export interface AuthUser {
@@ -50,4 +54,52 @@ export interface FeeBreakdown {
   exchangeRate: number;
   totalFee: number;
   recipientGets: number;
+}
+
+// Stellar Wallet Types
+export interface StellarWallet {
+  name: string;
+  icon: string;
+  description: string;
+  isInstalled: boolean;
+  connect: () => Promise<StellarAccount>;
+}
+
+export interface StellarAccount {
+  publicKey: string;
+  balance: number;
+  provider: string;
+  isTestnet?: boolean;
+}
+
+export interface WalletTransaction {
+  id: string;
+  hash?: string;
+  type: 'payment' | 'pathPayment';
+  amount: string;
+  asset: string;
+  destination: string;
+  memo?: string;
+  status: 'pending' | 'submitted' | 'success' | 'failed';
+  createdAt: Date;
+  stellarHash?: string;
+  networkFee?: string;
+}
+
+export interface TransactionPreview {
+  amount: string;
+  asset: string;
+  destination: string;
+  memo?: string;
+  networkFee: string;
+  estimatedTime: string;
+}
+
+export type WalletProvider = 'freighter' | 'albedo' | 'walletconnect' | 'rabet' | 'internal';
+
+export interface WalletConnectionState {
+  isConnected: boolean;
+  account?: StellarAccount;
+  provider?: WalletProvider;
+  error?: string;
 }
