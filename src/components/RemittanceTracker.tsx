@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { PickupLocation } from '@/types';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface RemittanceTrackerProps {
   transferId: string;
@@ -50,6 +51,21 @@ export function RemittanceTracker({
   timeline
 }: RemittanceTrackerProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [escrow, setEscrow] = useState<import('../types/escrow').EscrowEntry | null>(null);
+  
+  useEffect(() => {
+    let mounted = true;
+    import('../lib/escrow').then(async (mod) => {
+      const e = await mod.ensureEscrow(transferId, amount, currency);
+      if (!mounted) return;
+      setEscrow(e);
+      const unsub = mod.onEscrowStatusChange((entry) => {
+        if (entry.transferId === transferId) setEscrow(entry);
+      });
+      return () => unsub();
+    });
+    return () => { mounted = false; };
+  }, [transferId, amount, currency]);
 
   const getStatusInfo = () => {
     switch (status) {
@@ -164,6 +180,35 @@ export function RemittanceTracker({
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Escrow status (separate block) */}
+        {escrow && (
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Escrow status:</span>
+                <span className={cn(
+                  'px-2 py-0.5 rounded text-xs font-medium',
+                  escrow.status === 'held' && 'bg-yellow-50 text-amber-700 border border-amber-100',
+                  escrow.status === 'released' && 'bg-green-50 text-green-700 border border-green-100',
+                  escrow.status === 'refunded' && 'bg-red-50 text-red-700 border border-red-100',
+                  escrow.status === 'delayed' && 'bg-orange-50 text-orange-700 border border-orange-100',
+                  escrow.status === 'disputed' && 'bg-slate-50 text-slate-700 border border-slate-100'
+                )}>
+                  {escrow.status.replace('_', ' ')}
+                </span>
+              </div>
+
+              <p className="text-sm text-muted-foreground mt-2">
+                {escrow.status === 'held' && 'Funds for this transfer are temporarily secured in escrow — they are reserved and guaranteed while the transfer is processed. You will either see them released to the recipient, or refunded automatically if the transfer fails.'}
+                {escrow.status === 'released' && 'Escrow released — funds have been transferred to the recipient.'}
+                {escrow.status === 'refunded' && 'Escrow refunded — funds returned to sender.'}
+                {escrow.status === 'delayed' && 'Release delayed — the transfer is under review. We will notify you with next steps.'}
+                {escrow.status === 'disputed' && 'This transfer is disputed and under investigation. Our team will resolve it and ensure your funds are safe.'}
+              </p>
+            </div>
+          </div>
         )}
 
         {/* Method and Partner Info */}

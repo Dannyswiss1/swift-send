@@ -62,6 +62,19 @@ export function RemittanceFlowDemo() {
       ]
     },
     {
+      id: 'escrow',
+      title: 'Escrow Hold',
+      description: 'Funds temporarily secured to guarantee the transfer',
+      icon: Shield,
+      status: 'upcoming',
+      estimatedTime: 'Immediate — held until completion',
+      details: [
+        'Sender funds are reserved and cannot be spent elsewhere',
+        'Recipient will receive funds when escrow is released',
+        'Automatic refund if transfer fails or is reversed'
+      ]
+    },
+    {
       id: 'notification',
       title: 'Notify Recipient',
       description: 'Automatic notifications and confirmation code',
