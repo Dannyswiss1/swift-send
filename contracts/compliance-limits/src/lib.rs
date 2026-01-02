@@ -1,14 +1,12 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, Val};
-use stellar_contract_utils::address::get_invoker;
-use stellar_macros::stellarize;
+use soroban_sdk::{contract, contractimpl, contracttype, contracterror, symbol_short, Address, BytesN, Env, Symbol, panic_with_error};
 
 const SECONDS_PER_DAY: u64 = 86_400;
 const SECONDS_PER_MONTH: u64 = 2_592_000; // approx 30 days
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[contracttype]
+#[contracterror]
 pub enum Error {
     AlreadyInitialized = 1,
     NotInitialized = 2,
@@ -36,6 +34,15 @@ pub struct Usage {
     pub monthly_spent: i128,
     pub last_day: u64,
     pub last_month: u64,
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub struct UsageEvent {
+    pub user_id: BytesN<32>,
+    pub tier: Symbol,
+    pub daily_spent: i128,
+    pub monthly_spent: i128,
 }
 
 #[derive(Clone)]
@@ -115,11 +122,15 @@ fn reset_if_needed(env: &Env, usage: &mut Usage) {
 }
 
 fn emit(env: &Env, topic: Symbol, usage: &Usage) {
-    env.events()
-        .publish((symbol_short!("limits"), topic), usage.clone());
+    let event = UsageEvent {
+        user_id: usage.user_id.clone(),
+        tier: usage.tier.clone(),
+        daily_spent: usage.daily_spent,
+        monthly_spent: usage.monthly_spent,
+    };
+    env.events().publish((symbol_short!("limits"), topic), event);
 }
 
-#[stellarize]
 #[contract]
 pub struct ComplianceLimits;
 

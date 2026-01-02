@@ -1,11 +1,9 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol, Val};
-use stellar_contract_utils::address::get_invoker;
-use stellar_macros::stellarize;
+use soroban_sdk::{contract, contractimpl, contracttype, contracterror, symbol_short, Address, Bytes, BytesN, Env, Symbol, panic_with_error};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[contracttype]
+#[contracterror]
 pub enum Error {
     AlreadyInitialized = 1,
     NotInitialized = 2,
@@ -20,6 +18,15 @@ pub struct UserProfile {
     pub wallet: Address,
     pub guardian: Option<Address>,
     pub metadata: Option<Bytes>,
+    pub updated_at: u64,
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub struct UserProfileEvent {
+    pub user_id: BytesN<32>,
+    pub wallet: Address,
+    pub guardian: Option<Address>,
     pub updated_at: u64,
 }
 
@@ -58,11 +65,15 @@ fn write_profile(env: &Env, profile: &UserProfile) {
 }
 
 fn emit(env: &Env, topic: Symbol, profile: &UserProfile) {
-    env.events()
-        .publish((symbol_short!("registry"), topic), profile);
+    let event = UserProfileEvent {
+        user_id: profile.user_id.clone(),
+        wallet: profile.wallet.clone(),
+        guardian: profile.guardian.clone(),
+        updated_at: profile.updated_at,
+    };
+    env.events().publish((symbol_short!("registry"), topic), event);
 }
 
-#[stellarize]
 #[contract]
 pub struct WalletRegistry;
 
@@ -83,14 +94,7 @@ impl WalletRegistry {
         metadata: Option<Bytes>,
     ) -> UserProfile {
         let admin = read_admin(&env);
-        let invoker = env.invoker();
-        if invoker == wallet {
-            wallet.require_auth();
-        } else if invoker == admin {
-            admin.require_auth();
-        } else {
-            panic!("unauthorized invoker");
-        }
+        wallet.require_auth();
         Self::store(env, user_id, wallet, None, metadata)
     }
 

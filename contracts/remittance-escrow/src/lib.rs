@@ -1,13 +1,11 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env, IntoVal, Symbol, Vec, Val};
-use stellar_contract_utils::address::get_invoker;
-use stellar_macros::stellarize;
+use soroban_sdk::{contract, contractimpl, contracttype, contracterror, symbol_short, Address, Bytes, BytesN, Env, Symbol, Vec, panic_with_error};
 
 const MAX_INDEX: u32 = 256;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[contracttype]
+#[contracterror]
 pub enum Error {
     AlreadyInitialized = 1,
     NotInitialized = 2,
@@ -41,6 +39,17 @@ pub struct Transfer {
     pub expires_at: u64,
     pub metadata: Option<Bytes>,
     pub last_tx: Option<BytesN<32>>,
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub struct TransferEvent {
+    pub id: BytesN<32>,
+    pub sender: Address,
+    pub recipient: Address,
+    pub asset: Address,
+    pub amount: i128,
+    pub status: TransferStatus,
 }
 
 #[derive(Clone)]
@@ -87,13 +96,17 @@ fn touch_index(env: &Env, id: &BytesN<32>) {
 }
 
 fn emit(env: &Env, topic: Symbol, transfer: &Transfer) {
-    env.events().publish(
-        (symbol_short!("escrow"), topic),
-        transfer.into_val(env),
-    );
+    let event = TransferEvent {
+        id: transfer.id.clone(),
+        sender: transfer.sender.clone(),
+        recipient: transfer.recipient.clone(),
+        asset: transfer.asset.clone(),
+        amount: transfer.amount,
+        status: transfer.status,
+    };
+    env.events().publish((symbol_short!("escrow"), topic), event);
 }
 
-#[stellarize]
 #[contract]
 pub struct RemittanceEscrow;
 
