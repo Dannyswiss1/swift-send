@@ -11,8 +11,9 @@ import { CompliancePreCheck } from '@/components/ComplianceCheck';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { useCompliance } from '@/contexts/ComplianceContext';
-import { contacts, calculateFees } from '@/data/mockData';
+import { contacts } from '@/data/mockData';
 import { Contact, TransactionPreview } from '@/types';
+import { calculateSendFees } from '@/lib/fees';
 import { ArrowLeft, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Clock, Wallet, MapPin, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -61,7 +62,7 @@ export default function SendMoney() {
 
   const fees = useMemo(() => {
     const parsedAmount = parseFloat(amount) || 0;
-    return calculateFees(parsedAmount);
+    return calculateSendFees(parsedAmount);
   }, [amount]);
 
   const handleSelectContact = (contact: Contact) => {
