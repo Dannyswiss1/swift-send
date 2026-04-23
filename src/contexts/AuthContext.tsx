@@ -1,24 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { User, AuthUser } from '@/types';
-import { apiFetch } from '@/lib/api';
-
-function parseUserDto(data: unknown): User {
-  const u = data as Record<string, unknown>;
-  return {
-    id: String(u.id),
-    name: String(u.name),
-    phone: String(u.phone),
-    email: u.email ? String(u.email) : undefined,
-    balance: Number(u.balance ?? 0),
-    usdcBalance: Number(u.usdcBalance ?? u.balance ?? 0),
-    localCurrency: String(u.localCurrency ?? 'USD'),
-    exchangeRate: Number(u.exchangeRate ?? 1),
-    isVerified: Boolean(u.isVerified),
-    onboardingCompleted: Boolean(u.onboardingCompleted),
-    walletAddress: u.walletAddress ? String(u.walletAddress) : undefined,
-    createdAt: u.createdAt ? new Date(String(u.createdAt)) : new Date(),
-  };
-}
+import React, { createContext, useContext, ReactNode, useEffect, useMemo, useReducer, useCallback } from 'react';
+import type { User, AuthUser } from '@/types';
+import * as authApi from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -38,187 +20,156 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [onboardingStep, setOnboardingStep] = useState(0);
+type AuthStatus = 'idle' | 'bootstrapping' | 'ready';
 
-  const applySessionPayload = useCallback(
-    (payload: { authUser: AuthUser; user?: unknown | null; onboardingRequired?: boolean }) => {
-      setAuthUser(payload.authUser);
-      if (payload.user) {
-        setUser(parseUserDto(payload.user));
-      } else {
-        setUser(null);
-      }
-      if (payload.onboardingRequired) {
-        setOnboardingStep(1);
-      } else if (payload.user) {
-        setOnboardingStep(0);
-      }
-    },
-    []
-  );
+interface AuthState {
+  status: AuthStatus;
+  user: User | null;
+  authUser: AuthUser | null;
+  onboardingStep: number;
+}
 
+type AuthAction =
+  | { type: 'BOOTSTRAP_START' }
+  | { type: 'SESSION_APPLY'; authUser: AuthUser; user: User | null; onboardingRequired?: boolean }
+  | { type: 'LOGOUT' }
+  | { type: 'SET_ONBOARDING_STEP'; step: number }
+  | { type: 'UPDATE_BALANCE'; balance: number };
+
+const initialState: AuthState = {
+  status: 'idle',
+  user: null,
+  authUser: null,
+  onboardingStep: 0,
+};
+
+function reducer(state: AuthState, action: AuthAction): AuthState {
+  switch (action.type) {
+    case 'BOOTSTRAP_START':
+      return { ...state, status: 'bootstrapping' };
+    case 'SESSION_APPLY': {
+      const nextOnboardingStep = action.onboardingRequired ? 1 : action.user ? 0 : state.onboardingStep;
+      return {
+        status: 'ready',
+        user: action.user,
+        authUser: action.authUser,
+        onboardingStep: nextOnboardingStep,
+      };
+    }
+    case 'SET_ONBOARDING_STEP':
+      return { ...state, onboardingStep: action.step };
+    case 'UPDATE_BALANCE':
+      return state.user
+        ? { ...state, user: { ...state.user, balance: action.balance, usdcBalance: action.balance } }
+        : state;
+    case 'LOGOUT':
+      return { status: 'ready', user: null, authUser: null, onboardingStep: 0 };
+    default:
+      return state;
+  }
+}
+
+function useAuthBootstrap(dispatch: React.Dispatch<AuthAction>) {
   useEffect(() => {
     let cancelled = false;
+    dispatch({ type: 'BOOTSTRAP_START' });
     (async () => {
       try {
-        const res = await apiFetch('/auth/me');
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as {
-          authUser: AuthUser;
-          user: unknown | null;
-          onboardingRequired?: boolean;
-        };
+        const dto = await authApi.authMe();
         if (cancelled) return;
-        applySessionPayload(data);
+        dispatch({
+          type: 'SESSION_APPLY',
+          authUser: dto.authUser,
+          user: dto.user ? authApi.parseUserDto(dto.user) : null,
+          onboardingRequired: dto.onboardingRequired,
+        });
       } catch {
-        // offline or server down — stay logged out
+        // not logged in / offline / server down
+        if (cancelled) return;
+        dispatch({ type: 'LOGOUT' });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [applySessionPayload]);
+  }, [dispatch]);
+}
 
-  const login = async (identifier: string): Promise<{ needsVerification: boolean; isNewUser: boolean }> => {
-    const res = await apiFetch('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ identifier }),
-    });
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: string;
-      needsVerification?: boolean;
-      isNewUser?: boolean;
-      authUser?: AuthUser;
-      user?: unknown | null;
-    };
-    if (!res.ok) {
-      throw new Error(body.error || 'Login failed');
-    }
-    if (body.authUser) {
-      applySessionPayload({
-        authUser: body.authUser,
-        user: body.user ?? null,
-        onboardingRequired: false,
-      });
-    }
-    const needsVerification = Boolean(body.needsVerification);
-    if (needsVerification) {
-      setOnboardingStep(0);
-    }
-    return {
-      needsVerification,
-      isNewUser: Boolean(body.isNewUser),
-    };
-  };
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, initialState);
+  useAuthBootstrap(dispatch);
 
-  const signup = async (identifier: string, _name?: string): Promise<{ needsVerification: boolean }> => {
-    const res = await apiFetch('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify({ identifier }),
+  const login = useCallback(async (identifier: string) => {
+    const dto = await authApi.login(identifier);
+    dispatch({
+      type: 'SESSION_APPLY',
+      authUser: dto.authUser,
+      user: dto.user ? authApi.parseUserDto(dto.user) : null,
+      onboardingRequired: false,
     });
-    const body = (await res.json().catch(() => ({}))) as { error?: string; authUser?: AuthUser };
-    if (!res.ok) {
-      throw new Error(body.error || 'Sign up failed');
-    }
-    if (body.authUser) {
-      setAuthUser(body.authUser);
-      setUser(null);
-      setOnboardingStep(0);
-    }
+    if (dto.needsVerification) dispatch({ type: 'SET_ONBOARDING_STEP', step: 0 });
+    return { needsVerification: dto.needsVerification, isNewUser: dto.isNewUser };
+  }, []);
+
+  const signup = useCallback(async (identifier: string, _name?: string) => {
+    const dto = await authApi.signup(identifier);
+    dispatch({ type: 'SESSION_APPLY', authUser: dto.authUser, user: null, onboardingRequired: false });
+    dispatch({ type: 'SET_ONBOARDING_STEP', step: 0 });
     return { needsVerification: true };
-  };
+  }, []);
 
-  const verifyCode = async (code: string) => {
-    const res = await apiFetch('/auth/verify', {
-      method: 'POST',
-      body: JSON.stringify({ code }),
+  const verifyCode = useCallback(async (code: string) => {
+    const dto = await authApi.verifyCode(code);
+    dispatch({
+      type: 'SESSION_APPLY',
+      authUser: dto.authUser,
+      user: dto.user ? authApi.parseUserDto(dto.user) : null,
+      onboardingRequired: dto.onboardingRequired,
     });
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: string;
-      authUser?: AuthUser;
-      user?: unknown | null;
-      onboardingRequired?: boolean;
-    };
-    if (!res.ok) {
-      throw new Error(body.error || 'Verification failed');
-    }
-    if (body.authUser) {
-      applySessionPayload({
-        authUser: body.authUser,
-        user: body.user ?? null,
-        onboardingRequired: body.onboardingRequired,
-      });
-    }
-  };
+  }, []);
 
-  const resendCode = async () => {
+  const resendCode = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
-  };
+  }, []);
 
-  const completeOnboarding = async (userData: Partial<User>) => {
-    const res = await apiFetch('/auth/onboarding/complete', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: userData.name,
-        email: userData.email,
-        phone: userData.phone,
-      }),
+  const completeOnboarding = useCallback(async (userData: Partial<User>) => {
+    const dto = await authApi.completeOnboarding(userData);
+    dispatch({
+      type: 'SESSION_APPLY',
+      authUser: dto.authUser,
+      user: authApi.parseUserDto(dto.user),
+      onboardingRequired: false,
     });
-    const body = (await res.json().catch(() => ({}))) as { error?: string; user?: unknown; authUser?: AuthUser };
-    if (!res.ok) {
-      throw new Error(body.error || 'Could not complete onboarding');
-    }
-    if (body.authUser && body.user) {
-      applySessionPayload({
-        authUser: body.authUser,
-        user: body.user,
-        onboardingRequired: false,
-      });
-    }
-  };
+  }, []);
 
-  const logout = () => {
-    void apiFetch('/auth/logout', { method: 'POST' }).finally(() => {
-      setUser(null);
-      setAuthUser(null);
-      setOnboardingStep(0);
-    });
-  };
+  const logout = useCallback(() => {
+    void authApi.logout().finally(() => dispatch({ type: 'LOGOUT' }));
+  }, []);
 
-  const updateBalance = (newBalance: number) => {
-    if (user) {
-      setUser({
-        ...user,
-        balance: newBalance,
-        usdcBalance: newBalance,
-      });
-    }
-  };
+  const updateBalance = useCallback((newBalance: number) => dispatch({ type: 'UPDATE_BALANCE', balance: newBalance }), []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        authUser,
-        isAuthenticated: !!user,
-        isVerified: !!authUser?.isVerified,
-        onboardingStep,
-        login,
-        signup,
-        verifyCode,
-        resendCode,
-        completeOnboarding,
-        logout,
-        updateBalance,
-        setOnboardingStep,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const setOnboardingStep = useCallback((step: number) => dispatch({ type: 'SET_ONBOARDING_STEP', step }), []);
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user: state.user,
+      authUser: state.authUser,
+      isAuthenticated: !!state.user,
+      isVerified: !!state.authUser?.isVerified,
+      onboardingStep: state.onboardingStep,
+      login,
+      signup,
+      verifyCode,
+      resendCode,
+      completeOnboarding,
+      logout,
+      updateBalance,
+      setOnboardingStep,
+    }),
+    [state, login, signup, verifyCode, resendCode, completeOnboarding, logout, updateBalance, setOnboardingStep]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
