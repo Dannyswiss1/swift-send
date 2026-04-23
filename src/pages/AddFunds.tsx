@@ -233,6 +233,7 @@ export default function AddFunds() {
           <label className="block text-sm font-medium mb-2">Amount (USD)</label>
           <Input
             type="number"
+            inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
@@ -408,7 +409,7 @@ export default function AddFunds() {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-32">
       <main className="px-6 pt-6">
         <div className="max-w-lg mx-auto">
           {step === 'method' && renderMethodSelection()}
