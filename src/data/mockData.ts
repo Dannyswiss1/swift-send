@@ -81,7 +81,7 @@ export const transactions: Transaction[] = [
     recipientAmount: 149.65,
     recipientName: 'Carlos Reyes',
     recipientPhone: '+502 5555 1234',
-    status: 'pending',
+    status: 'processing',
     timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 mins ago
     exchangeRate: 7.85,
     destinationCurrency: 'GTQ',
@@ -96,6 +96,19 @@ export const transactions: Transaction[] = [
     recipientPhone: '+1 (555) 987-6543',
     status: 'completed',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+  },
+  {
+    id: '5',
+    type: 'send',
+    amount: 75,
+    fee: 0.2,
+    recipientAmount: 74.8,
+    recipientName: 'Ana Lopez',
+    recipientPhone: '+503 7890 1234',
+    status: 'failed',
+    timestamp: new Date(Date.now() - 1000 * 60 * 45), // 45 mins ago
+    exchangeRate: 8.75,
+    destinationCurrency: 'SVC',
   },
 ];
 

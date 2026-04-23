@@ -30,7 +30,9 @@ const History: React.FC = () => {
     const sentTransactions = user?.transactions?.filter(t => t.type === 'send') || [];
     const totalSent = sentTransactions.reduce((sum, t) => sum + t.amount, 0);
     const totalFees = sentTransactions.reduce((sum, t) => sum + t.fee, 0);
-    const pendingTransactions = user?.transactions?.filter(t => t.status === 'pending').length || 0;
+    const pendingTransactions = user?.transactions?.filter(
+      (t) => t.status === 'pending' || t.status === 'processing'
+    ).length || 0;
     const thisMonth = user?.transactions?.filter(t => {
       const transactionDate = new Date(t.timestamp);
       const now = new Date();
@@ -94,6 +96,7 @@ const History: React.FC = () => {
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },
+    { value: 'processing', label: 'Processing' },
     { value: 'completed', label: 'Completed' },
     { value: 'pending', label: 'Pending' },
     { value: 'failed', label: 'Failed' }
