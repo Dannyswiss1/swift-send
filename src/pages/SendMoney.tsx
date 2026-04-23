@@ -5,15 +5,17 @@ import { Input } from '@/components/ui/input';
 import { ContactItem } from '@/components/ContactItem';
 import { FeeBreakdown } from '@/components/FeeBreakdown';
 import { BottomNav } from '@/components/BottomNav';
+import { NetworkStatusIndicator } from '@/components/NetworkStatusIndicator';
 import TransactionSigningDialog from '@/components/TransactionSigning';
 import { CompliancePreCheck } from '@/components/ComplianceCheck';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { useCompliance } from '@/contexts/ComplianceContext';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { createTransfer } from '@/lib/transfers';
 import { contacts, calculateFees } from '@/data/mockData';
 import { Contact, TransactionPreview } from '@/types';
-import { ArrowLeft, ArrowRight, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Wallet, MapPin, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Wallet, MapPin, AlertTriangle, CloudOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'success';
@@ -37,6 +39,7 @@ export default function SendMoney() {
   const { user, transactionSigningSecret, updateBalance } = useAuth();
   const { connectionState } = useWallet();
   const { checkTransactionCompliance } = useCompliance();
+  const network = useNetworkStatus();
   const [step, setStep] = useState<Step>('recipient');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [newRecipient, setNewRecipient] = useState<NewRecipient | null>(null);
@@ -87,6 +90,8 @@ export default function SendMoney() {
     if (amountValue > (user?.usdcBalance || 0)) return 'Insufficient balance';
     return null;
   }, [amount, amountValue, user?.usdcBalance]);
+  const isNetworkOffline = network.status === 'offline';
+  const networkBlockingMessage = isNetworkOffline ? 'Stellar is offline. Transfers are temporarily unavailable.' : null;
 
   const recipientError = useMemo(() => {
     if (!recipientInput.trim()) return 'Recipient email or phone is required';
@@ -129,6 +134,12 @@ export default function SendMoney() {
   }, [amountError]);
 
   const handleConfirmSend = async () => {
+    if (isNetworkOffline) {
+      setSubmissionError(networkBlockingMessage);
+      toast.error(networkBlockingMessage);
+      return;
+    }
+
     if (amountError) {
       setSubmissionError(amountError);
       toast.error(amountError);
@@ -447,6 +458,8 @@ export default function SendMoney() {
           {/* Step 2: Enter Amount */}
           {step === 'amount' && (selectedContact || newRecipient) && (
             <div className="space-y-6 animate-fade-in">
+              <NetworkStatusIndicator network={network} compact />
+
               {/* Recipient Display */}
               <div className="bg-card rounded-xl p-4 shadow-card">
                 <div className="flex items-center gap-4">
@@ -514,6 +527,9 @@ export default function SendMoney() {
                 )}
                 {submissionError && !amountError && (
                   <p className="mt-2 text-sm text-destructive">{submissionError}</p>
+                )}
+                {networkBlockingMessage && (
+                  <p className="mt-2 text-sm text-destructive">{networkBlockingMessage}</p>
                 )}
 
                 {/* Compliance Check for Amount */}
@@ -636,10 +652,12 @@ export default function SendMoney() {
                 size="lg"
                 className="w-full"
                 onClick={handleAmountSubmit}
-                disabled={Boolean(amountError)}
+                disabled={Boolean(amountError) || isNetworkOffline}
               >
                 {!amount || amountValue <= 0 ? (
                   'Enter amount to continue'
+                ) : isNetworkOffline ? (
+                  'Network offline'
                 ) : amountValue > (user?.usdcBalance || 0) ? (
                   'Insufficient balance'
                 ) : amountValue > MAX_TRANSFER_AMOUNT ? (
@@ -657,6 +675,8 @@ export default function SendMoney() {
           {/* Step 3: Confirm */}
           {step === 'confirm' && (selectedContact || newRecipient) && (
             <div className="space-y-6 animate-fade-in">
+              <NetworkStatusIndicator network={network} />
+
               {/* Transfer Summary */}
               <div className="bg-card rounded-2xl p-6 shadow-soft">
                 <div className="text-center mb-6">
@@ -707,7 +727,9 @@ export default function SendMoney() {
                         <Globe2 className="w-4 h-4 text-blue-600" />
                         <span className="font-medium text-blue-900 dark:text-blue-100">Network</span>
                       </div>
-                      <span className="text-blue-700 dark:text-blue-300 font-semibold">Stellar Mainnet</span>
+                      <span className="text-blue-700 dark:text-blue-300 font-semibold">
+                        {network.status === 'offline' ? 'Offline' : `Stellar Mainnet • ${network.latencyMs ?? '--'} ms`}
+                      </span>
                     </div>
                   </div>
 
@@ -826,13 +848,18 @@ export default function SendMoney() {
                   size="lg"
                   className="w-full"
                   onClick={handleConfirmSend}
-                  disabled={isProcessing || Boolean(amountError)}
+                  disabled={isProcessing || Boolean(amountError) || isNetworkOffline}
                 >
                   {isProcessing ? (
                     <div className="flex items-center gap-2">
                       <div className="animate-spin w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"></div>
                       <span>Sending money...</span>
                     </div>
+                  ) : isNetworkOffline ? (
+                    <>
+                      <CloudOff className="w-5 h-5" />
+                      Network offline
+                    </>
                   ) : (
                     <>
                       <Send className="w-5 h-5" />
