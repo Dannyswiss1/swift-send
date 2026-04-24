@@ -425,5 +425,4 @@ export const oxxoLocations: PickupLocation[] = [
   },
 ];
 
-// Re-export from fee calculator for backward compatibility
-export { calculateTransferFees as calculateFees } from "@/lib/feeCalculator";
+// Fee logic moved to `src/lib/fees.ts`.

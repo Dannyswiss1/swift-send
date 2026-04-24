@@ -66,10 +66,8 @@ function sortValue(value: JsonLike): JsonLike {
   return value;
 }
 
-export function canonicalizeTransferPayload(
-  payload: TransferCreatePayload,
-): string {
-  return JSON.stringify(sortValue(payload as JsonLike));
+export function canonicalizeTransferPayload(payload: TransferCreatePayload): string {
+  return JSON.stringify(sortValue(payload as any));
 }
 
 async function signPayload(payload: string, secret: string): Promise<string> {
