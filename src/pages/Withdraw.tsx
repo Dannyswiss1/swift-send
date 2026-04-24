@@ -330,6 +330,7 @@ export default function Withdraw() {
           <label className="block text-sm font-medium mb-2">Send Amount (USD)</label>
           <Input
             type="number"
+            inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
@@ -551,7 +552,7 @@ export default function Withdraw() {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-32">
       <main className="px-6 pt-6">
         <div className="max-w-lg mx-auto">
           {step === 'recipient' && renderRecipientSelection()}
