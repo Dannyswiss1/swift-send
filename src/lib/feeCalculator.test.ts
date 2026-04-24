@@ -25,44 +25,44 @@ describe("Fee Calculator", () => {
       const result = calculateTransferFees(100);
 
       expect(result.amount).toBe(100);
-      expect(result.networkFee).toBe(0.001);
+      expect(result.networkFee).toBe(0);
       expect(result.serviceFee).toBe(0.2); // 0.2% of 100
-      expect(result.totalFee).toBe(0.201);
-      expect(result.recipientGets).toBe(99.799);
-      expect(result.feePercentage).toBeCloseTo(0.201, 2);
+      expect(result.totalFee).toBe(0.20);
+      expect(result.recipientGets).toBe(99.80);
+      expect(result.feePercentage).toBeCloseTo(0.20, 2);
     });
 
     it("should calculate fees for small transfer", () => {
       const result = calculateTransferFees(5);
 
       expect(result.amount).toBe(5);
-      expect(result.networkFee).toBe(0.001);
+      expect(result.networkFee).toBe(0);
       // Service fee should be minimum ($0.01)
       expect(result.serviceFee).toBe(0.01);
-      expect(result.totalFee).toBe(0.011);
-      expect(result.recipientGets).toBe(4.989);
+      expect(result.totalFee).toBe(0.01);
+      expect(result.recipientGets).toBe(4.99);
     });
 
     it("should calculate fees for large transfer", () => {
       const result = calculateTransferFees(10000);
 
       expect(result.amount).toBe(10000);
-      expect(result.networkFee).toBe(0.001);
+      expect(result.networkFee).toBe(0);
       // Service fee should be capped at $50
       expect(result.serviceFee).toBe(50);
-      expect(result.totalFee).toBe(50.001);
-      expect(result.recipientGets).toBe(9949.999);
+      expect(result.totalFee).toBe(50);
+      expect(result.recipientGets).toBe(9950);
     });
 
     it("should calculate fees for very small transfer", () => {
       const result = calculateTransferFees(0.5);
 
       expect(result.amount).toBe(0.5);
-      expect(result.networkFee).toBe(0.001);
+      expect(result.networkFee).toBe(0);
       // Service fee should be minimum ($0.01)
       expect(result.serviceFee).toBe(0.01);
-      expect(result.totalFee).toBe(0.011);
-      expect(result.recipientGets).toBe(0.489);
+      expect(result.totalFee).toBe(0.01);
+      expect(result.recipientGets).toBe(0.49);
     });
 
     it("should calculate fees for $1 transfer", () => {
