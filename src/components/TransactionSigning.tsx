@@ -59,12 +59,20 @@ export default function TransactionSigningDialog({
   }, [isOpen]);
 
   const handleSign = async () => {
+    if (isSigningTransaction || step === 'signing') {
+      return;
+    }
+
     if (!connectionState.isConnected) {
+      toast.error('No wallet connected');
       onError('No wallet connected');
       return;
     }
 
     setStep('signing');
+    const toastId = toast.loading('Waiting for wallet approval...', {
+      description: `Please confirm in your ${connectionState.provider} wallet.`,
+    });
     
     try {
       const hash = await signTransaction({
@@ -76,11 +84,20 @@ export default function TransactionSigningDialog({
       
       setTxHash(hash);
       setStep('success');
+      toast.success('Transaction signed!', {
+        id: toastId,
+        description: `Hash: ${hash.slice(0, 8)}...${hash.slice(-6)}`,
+      });
       onSuccess(hash);
     } catch (err: any) {
-      setError(err.message || 'Transaction signing failed');
+      const message = err.message || 'Transaction signing failed';
+      setError(message);
       setStep('error');
-      onError(err.message || 'Transaction signing failed');
+      toast.error('Transaction failed', {
+        id: toastId,
+        description: message,
+      });
+      onError(message);
     }
   };
 
@@ -179,7 +196,7 @@ export default function TransactionSigningDialog({
         <Button variant="outline" onClick={onClose} className="flex-1">
           Cancel
         </Button>
-        <Button onClick={handleSign} className="flex-1">
+        <Button onClick={handleSign} className="flex-1" disabled={isSigningTransaction || step === 'signing'}>
           Sign Transaction
           <ArrowUpRight className="w-4 h-4" />
         </Button>
