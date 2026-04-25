@@ -2,6 +2,7 @@ import { config, AppConfig } from './config';
 import { EventBus } from './core/eventBus';
 import { ActivityService } from './modules/activity/activityService';
 import { ComplianceService } from './modules/compliance/complianceService';
+import { CountryMetadataService } from './modules/countries/countryMetadataService';
 import { FraudService } from './modules/fraud/fraudService';
 import { createDemoNotifications } from './modules/notifications/demoNotifications';
 import { NotificationService } from './modules/notifications/notificationService';
@@ -26,6 +27,7 @@ export interface AppContainer {
     activity: ActivityService;
     health: SystemHealthService;
     contracts: ContractService;
+    countryMetadata: CountryMetadataService;
   };
 }
 
@@ -35,6 +37,7 @@ export function createContainer(): AppContainer {
   const fraud = new FraudService();
   const wallets = new WalletService();
   const contracts = new ContractService();
+  const countryMetadata = new CountryMetadataService();
   const transferRepository = new InMemoryTransferRepository(createDemoTransfers());
   const notifications = new NotificationService(eventBus, createDemoNotifications());
   const activity = new ActivityService(transferRepository, notifications);
@@ -83,6 +86,7 @@ export function createContainer(): AppContainer {
       activity,
       health,
       contracts,
+      countryMetadata,
     },
   };
 }
