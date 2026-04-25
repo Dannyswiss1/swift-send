@@ -7,16 +7,24 @@ import { FeeBreakdown } from '@/components/FeeBreakdown';
 import { BottomNav } from '@/components/BottomNav';
 import TransactionSigningDialog from '@/components/TransactionSigning';
 import { CompliancePreCheck } from '@/components/ComplianceCheck';
+import { CountryInfoPanel } from '@/components/CountryInfoPanel';
+import { CountrySummary } from '@/components/CountrySummary';
+import { ComplianceRulesList } from '@/components/ComplianceRulesList';
+import { NetworkStatusIndicator } from '@/components/NetworkStatusIndicator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { useCompliance } from '@/contexts/ComplianceContext';
-import { contacts, calculateFees } from '@/data/mockData';
+import { contacts } from '@/data/mockData';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useCountryInfo } from '@/hooks/useCountryInfo';
 import { Contact, TransactionPreview } from '@/types';
-import { ArrowLeft, ArrowRight, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Wallet, MapPin, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Wallet, MapPin, AlertTriangle, CloudOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { createTransfer } from '@/services/transfers';
+import { formatDeliveryEstimate } from '@/lib/countryTransferHelpers';
 
-type Step = 'recipient' | 'amount' | 'confirm' | 'success';
+type Step = 'recipient' | 'amount' | 'confirm' | 'processing' | 'success';
 
 interface NewRecipient {
   identifier: string; // email or phone
@@ -42,6 +50,12 @@ const DESTINATION_CURRENCY_BY_COUNTRY: Record<string, string> = {
   US: "USD",
 };
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'An unexpected error occurred';
+}
+
 const calculateFees = (amount: number) => {
   const networkFee = 0.0001;
   const serviceFee = amount * 0.005;
@@ -58,7 +72,6 @@ const calculateFees = (amount: number) => {
 
 export default function SendMoney() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { user, transactionSigningSecret, updateBalance } = useAuth();
   const { connectionState } = useWallet();
   const { checkTransactionCompliance } = useCompliance();
@@ -74,7 +87,11 @@ export default function SendMoney() {
   const [transactionPreview, setTransactionPreview] =
     useState<TransactionPreview | null>(null);
   const [useExternalWallet, setUseExternalWallet] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [queueJobId, setQueueJobId] = useState<string | null>(null);
+  const [allRulesAcknowledged, setAllRulesAcknowledged] = useState(false);
   const { rates, convert } = useExchangeRate();
+  const { data: countryInfo, isLoading: countryInfoLoading, isError: countryInfoError } = useCountryInfo(selectedContact?.countryCode ?? null);
 
   const countryToCurrency: Record<string, string> = {
     'MX': 'MXN',
@@ -89,7 +106,7 @@ export default function SendMoney() {
   };
 
   const recipientCurrency = useMemo(() => getRecipientCurrency(selectedContact), [selectedContact]);
-  const convertedAmount = useMemo(() => convert(amountValue, recipientCurrency), [amountValue, recipientCurrency, convert]);
+  const selectedCashOutMethod = useMemo(() => countryInfo?.cashOutMethods?.[0] ?? null, [countryInfo]);
 
   const filteredContacts = useMemo(
     () =>
@@ -119,6 +136,7 @@ export default function SendMoney() {
   }, [recipientInputType]);
 
   const amountValue = useMemo(() => Number.parseFloat(amount) || 0, [amount]);
+  const convertedAmount = useMemo(() => convert(amountValue, recipientCurrency), [amountValue, recipientCurrency, convert]);
 
   const fees = useMemo(() => {
     return calculateFees(amountValue);
@@ -799,13 +817,7 @@ export default function SendMoney() {
               {/* Real-time Fee Breakdown */}
               {amountValue > 0 && (
                 <div className="space-y-4">
-                  <FeeBreakdown
-                    amount={amountValue}
-                    networkFee={fees.networkFee}
-                    serviceFee={fees.serviceFee}
-                    totalFee={fees.totalFee}
-                    recipientGets={fees.recipientGets}
-                  />
+                  <FeeBreakdown amount={amountValue} />
 
                   {/* Compliance Check Display */}
                   {amountValue > 0 &&
@@ -982,13 +994,7 @@ export default function SendMoney() {
               </div>
 
               {/* Detailed Fee Breakdown */}
-              <FeeBreakdown
-                amount={parseFloat(amount)}
-                networkFee={fees.networkFee}
-                serviceFee={fees.serviceFee}
-                totalFee={fees.totalFee}
-                recipientGets={fees.recipientGets}
-              />
+              <FeeBreakdown amount={parseFloat(amount)} />
 
               {/* Country Summary — shown when countryInfo and selectedCashOutMethod are available (Req 5.1) */}
               {countryInfo && selectedCashOutMethod && (

@@ -25,7 +25,37 @@ interface TransferRequest {
   metadata?: Record<string, unknown>;
 }
 
+const NETWORK_FEE = 0.00001;
+const SERVICE_FEE_RATE = 0.005;
+const MIN_SERVICE_FEE = 0.01;
+const MAX_SERVICE_FEE = 25.0;
+
+function computeFeeEstimate(amount: number) {
+  const serviceFee = Math.min(Math.max(amount * SERVICE_FEE_RATE, MIN_SERVICE_FEE), MAX_SERVICE_FEE);
+  const totalFee = NETWORK_FEE + serviceFee;
+  return {
+    amount: parseFloat(amount.toFixed(4)),
+    network_fee: NETWORK_FEE,
+    service_fee: parseFloat(serviceFee.toFixed(4)),
+    total_fee: parseFloat(totalFee.toFixed(4)),
+    recipient_gets: parseFloat(Math.max(0, amount - totalFee).toFixed(4)),
+    fee_percentage: parseFloat(((totalFee / amount) * 100).toFixed(4)),
+  };
+}
+
 export default async function transferRoutes(fastify: FastifyInstance) {
+  fastify.get('/transfers/fee-estimate', async (req, reply) => {
+    const query = req.query as { amount?: string };
+    const amount = parseFloat(query.amount || '0');
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return reply.status(400).send({ error: 'amount must be a positive number' });
+    }
+    if (amount > 1_000_000) {
+      return reply.status(400).send({ error: 'amount exceeds maximum limit' });
+    }
+    return computeFeeEstimate(amount);
+  });
+
   fastify.post('/transfers', { preHandler: [requireVerifiedSession, requireAccessGuard] }, async (req, reply) => {
     const body = req.body as TransferRequest;
     try {
@@ -49,6 +79,10 @@ export default async function transferRoutes(fastify: FastifyInstance) {
       const details = err instanceof ValidationError ? err.details : undefined;
       return reply.status(statusCode).send({ error: errorMessage, details });
     }
+  });
+
+  fastify.get('/queue/stats', { preHandler: [requireVerifiedSession] }, async (_req, _reply) => {
+    return fastify.container.services.transferQueue.getQueueStats();
   });
 
   fastify.get('/transfers/:id/status', { preHandler: [requireVerifiedSession] }, async (req, reply) => {

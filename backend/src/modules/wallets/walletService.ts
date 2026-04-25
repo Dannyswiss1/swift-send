@@ -10,6 +10,7 @@ import {
   getEscrow as getEscrowEntry,
   releaseEscrow,
   refundEscrow,
+  disputeEscrow,
 } from '../../services/escrow';
 
 export interface ReserveFundsRequest {
@@ -64,7 +65,13 @@ export class WalletService {
 
   async settleEscrow(request: SettlementRequest) {
     const escrow = await getEscrowEntry(request.transferId);
-    if (!escrow) throw new NotFoundError('Escrow not found');
+    if (!escrow) throw new NotFoundError(`Escrow not found for transfer '${request.transferId}'`);
+    if (escrow.status !== 'held') {
+      throw new ValidationError(
+        `Cannot settle escrow in status '${escrow.status}': escrow must be 'held'`,
+        { transferId: request.transferId, currentStatus: escrow.status }
+      );
+    }
 
     // If this looks like a Stellar account, submit via Horizon before releasing escrow.
     // For non-wallet destinations (e.g. `recipient:<id>`), we keep prototype behavior.
@@ -100,7 +107,13 @@ export class WalletService {
 
   async refundEscrow(request: SettlementRequest) {
     const escrow = await getEscrowEntry(request.transferId);
-    if (!escrow) throw new NotFoundError('Escrow not found');
+    if (!escrow) throw new NotFoundError(`Escrow not found for transfer '${request.transferId}'`);
+    if (!['held', 'disputed'].includes(escrow.status)) {
+      throw new ValidationError(
+        `Cannot refund escrow in status '${escrow.status}': escrow must be 'held' or 'disputed'`,
+        { transferId: request.transferId, currentStatus: escrow.status }
+      );
+    }
 
     await postEntry(
       `escrow:${request.transferId}`,
@@ -116,6 +129,12 @@ export class WalletService {
     }
     logger.warn({ transferId: request.transferId }, 'escrow refunded');
     return escrow;
+  }
+
+  async disputeEscrow(transferId: string, reason?: string) {
+    const escrow = await getEscrowEntry(transferId);
+    if (!escrow) throw new NotFoundError(`Escrow not found for transfer '${transferId}'`);
+    return disputeEscrow(transferId, reason);
   }
 
   async getEscrow(transferId: string) {

@@ -3,14 +3,24 @@ import { requireVerifiedSession } from '../middleware/authenticate';
 
 interface EscrowOverrideBody {
   destination_account?: string;
+  reason?: string;
 }
 
 export default async function escrowRoutes(fastify: FastifyInstance) {
+  fastify.get('/escrow/:transferId', { preHandler: [requireVerifiedSession] }, async (req, reply) => {
+    const transferId = (req.params as { transferId: string }).transferId;
+    const escrow = await fastify.container.services.wallets.getEscrow(transferId);
+    if (!escrow) {
+      return reply.status(404).send({ error: `Escrow not found for transfer '${transferId}'` });
+    }
+    return escrow;
+  });
+
   fastify.post('/escrow/:transferId/release', { preHandler: [requireVerifiedSession] }, async (req, reply) => {
     const transferId = (req.params as { transferId: string }).transferId;
     const escrow = await fastify.container.services.wallets.getEscrow(transferId);
     if (!escrow) {
-      return reply.status(404).send({ error: 'escrow not found' });
+      return reply.status(404).send({ error: `Escrow not found for transfer '${transferId}'` });
     }
 
     const body = (req.body as EscrowOverrideBody) || {};
@@ -26,7 +36,8 @@ export default async function escrowRoutes(fastify: FastifyInstance) {
       });
       return { ...escrow, status: 'released', destination };
     } catch (err: any) {
-      return reply.status(err?.statusCode || 500).send({ error: err?.message || 'release failed' });
+      const statusCode = err?.statusCode || (err?.code === 'escrow_already_finalized' ? 409 : 500);
+      return reply.status(statusCode).send({ error: err?.message || 'Release failed', code: err?.code });
     }
   });
 
@@ -34,8 +45,10 @@ export default async function escrowRoutes(fastify: FastifyInstance) {
     const transferId = (req.params as { transferId: string }).transferId;
     const escrow = await fastify.container.services.wallets.getEscrow(transferId);
     if (!escrow) {
-      return reply.status(404).send({ error: 'escrow not found' });
+      return reply.status(404).send({ error: `Escrow not found for transfer '${transferId}'` });
     }
+
+    const body = (req.body as EscrowOverrideBody) || {};
 
     try {
       await fastify.container.services.wallets.refundEscrow({
@@ -43,11 +56,30 @@ export default async function escrowRoutes(fastify: FastifyInstance) {
         destinationAccount: `wallet:${transferId}`,
         amount: escrow.amount,
         currency: escrow.currency,
-        metadata: { reason: 'manual_refund' },
+        metadata: { reason: body.reason || 'manual_refund' },
       });
-      return { ...escrow, status: 'refunded' };
+      return { ...escrow, status: 'refunded', reason: body.reason };
     } catch (err: any) {
-      return reply.status(err?.statusCode || 500).send({ error: err?.message || 'refund failed' });
+      const statusCode = err?.statusCode || (err?.code === 'escrow_already_finalized' ? 409 : 500);
+      return reply.status(statusCode).send({ error: err?.message || 'Refund failed', code: err?.code });
+    }
+  });
+
+  fastify.post('/escrow/:transferId/dispute', { preHandler: [requireVerifiedSession] }, async (req, reply) => {
+    const transferId = (req.params as { transferId: string }).transferId;
+    const escrow = await fastify.container.services.wallets.getEscrow(transferId);
+    if (!escrow) {
+      return reply.status(404).send({ error: `Escrow not found for transfer '${transferId}'` });
+    }
+
+    const body = (req.body as EscrowOverrideBody) || {};
+
+    try {
+      const updated = await fastify.container.services.wallets.disputeEscrow(transferId, body.reason);
+      return { ...updated, message: 'Escrow marked as disputed. Funds are frozen pending resolution.' };
+    } catch (err: any) {
+      const statusCode = err?.statusCode || (err?.code === 'escrow_already_finalized' ? 409 : 500);
+      return reply.status(statusCode).send({ error: err?.message || 'Dispute failed', code: err?.code });
     }
   });
 }
