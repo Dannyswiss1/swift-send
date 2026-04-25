@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { withdrawalMethods, oxxoLocations, contacts } from '@/data/mockData';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { WithdrawalMethod, PickupLocation, Contact } from '@/types';
+import { calculateWithdrawalFees } from '@/lib/fees';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -89,24 +90,17 @@ export default function Withdraw() {
   };
 
   const fees = useMemo(() => {
-    if (!selectedMethod || !amount) return { fee: 0, total: parseFloat(amount) || 0, recipient: 0 };
-    
-    const parsedAmount = parseFloat(amount) || 0;
-    let fee = 0;
-    
-    if (selectedMethod.fees.fixed) fee += selectedMethod.fees.fixed;
-    if (selectedMethod.fees.percentage) fee += (parsedAmount * selectedMethod.fees.percentage / 100);
-    
-    const recipientAmount = (parsedAmount - fee) * recipientExchange.rate;
-    
-    return {
-      fee: Math.round(fee * 100) / 100,
-      total: parsedAmount,
-      net: Math.round((parsedAmount - fee) * 100) / 100,
-      recipient: Math.round(recipientAmount * 100) / 100,
+    if (!selectedMethod || !amount) {
+      const a = parseFloat(amount) || 0;
+      return { fee: 0, total: a, net: a, recipient: 0, exchangeRate: recipientExchange.rate, currency: recipientExchange.currency };
+    }
+
+    return calculateWithdrawalFees({
+      amount: parseFloat(amount) || 0,
+      method: selectedMethod,
       exchangeRate: recipientExchange.rate,
-      currency: recipientExchange.currency
-    };
+      currency: recipientExchange.currency,
+    });
   }, [selectedMethod, amount, recipientExchange]);
 
   const handleRecipientSelect = (contact: Contact) => {
@@ -344,6 +338,7 @@ export default function Withdraw() {
           <label className="block text-sm font-medium mb-2">Send Amount (USD)</label>
           <Input
             type="number"
+            inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
@@ -565,7 +560,7 @@ export default function Withdraw() {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-32">
       <main className="px-6 pt-6">
         <div className="max-w-lg mx-auto">
           {step === 'recipient' && renderRecipientSelection()}
