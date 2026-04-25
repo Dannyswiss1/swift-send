@@ -150,7 +150,7 @@ export default function SendMoney() {
     setSelectedContact(contact);
     setNewRecipient(null);
     setSubmissionError(null);
-    setStep("amount");
+    // Don't advance to "amount" yet — show CountryInfoPanel first (Req 1.1–1.5)
   }, []);
 
   const handleSelectNewRecipient = useCallback(() => {
@@ -285,9 +285,13 @@ export default function SendMoney() {
         selectedContact?.phone || newRecipient?.identifier || "";
       const recipientCountry = selectedContact?.countryCode || "US";
       const partnerCode =
-        CASH_PICKUP_PARTNER_BY_COUNTRY[recipientCountry] || "MONEYGRAM";
+        selectedCashOutMethod?.partnerName ??
+        CASH_PICKUP_PARTNER_BY_COUNTRY[recipientCountry] ??
+        "MONEYGRAM";
       const destinationCurrency =
-        DESTINATION_CURRENCY_BY_COUNTRY[recipientCountry] || "USD";
+        countryInfo?.currencyCode ??
+        DESTINATION_CURRENCY_BY_COUNTRY[recipientCountry] ??
+        "USD";
 
       const transfer = await createTransfer(
         {
@@ -326,9 +330,11 @@ export default function SendMoney() {
     },
     [
       amountValue,
+      countryInfo,
       fees.networkFee,
       fees.serviceFee,
       newRecipient,
+      selectedCashOutMethod,
       selectedContact,
       transactionSigningSecret,
       user,
@@ -397,7 +403,14 @@ export default function SendMoney() {
           <div className="bg-card rounded-xl p-4 shadow-card mb-6">
             <div className="flex items-center justify-between text-sm mb-3">
               <span className="text-muted-foreground">Estimated arrival</span>
-              <span className="font-semibold text-success">~5 seconds</span>
+              <span className="font-semibold text-success">
+                {countryInfo && selectedCashOutMethod
+                  ? formatDeliveryEstimate(
+                      selectedCashOutMethod.deliveryMinMinutes,
+                      selectedCashOutMethod.deliveryMaxMinutes
+                    )
+                  : "Delivery time unavailable"}
+              </span>
             </div>
             <div className="text-xs text-muted-foreground">
               Your money is now on the Stellar network. The recipient can access
@@ -581,6 +594,35 @@ export default function SendMoney() {
                   </div>
                 )}
               </div>
+
+              {/* Country Info Panel — shown after contact selection, before advancing (Req 1.1–1.5) */}
+              {selectedContact && (
+                <div className="space-y-4">
+                  <CountryInfoPanel
+                    countryInfo={countryInfo}
+                    isLoading={countryInfoLoading}
+                    isError={countryInfoError}
+                  />
+
+                  {/* Continue button — hidden when restricted (Req 1.4) */}
+                  {!countryInfo?.isRestricted && (
+                    <Button
+                      variant="hero"
+                      size="lg"
+                      className="w-full"
+                      onClick={() => setStep("amount")}
+                      disabled={countryInfoLoading}
+                    >
+                      {countryInfoLoading ? "Loading country info..." : (
+                        <>
+                          Continue
+                          <ArrowRight className="w-5 h-5" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -588,6 +630,15 @@ export default function SendMoney() {
           {step === "amount" && (selectedContact || newRecipient) && (
             <div className="space-y-6 animate-fade-in">
               <NetworkStatusIndicator network={network} compact />
+
+              {/* Country Info Panel — shown above amount input when contact selected (Req 2.1) */}
+              {selectedContact && (
+                <CountryInfoPanel
+                  countryInfo={countryInfo}
+                  isLoading={countryInfoLoading}
+                  isError={countryInfoError}
+                />
+              )}
 
               {/* Recipient Display */}
               <div className="bg-card rounded-xl p-4 shadow-card">
@@ -939,6 +990,36 @@ export default function SendMoney() {
                 recipientGets={fees.recipientGets}
               />
 
+              {/* Country Summary — shown when countryInfo and selectedCashOutMethod are available (Req 5.1) */}
+              {countryInfo && selectedCashOutMethod && (
+                <CountrySummary
+                  countryInfo={countryInfo}
+                  selectedMethod={selectedCashOutMethod}
+                  amount={amountValue}
+                  totalFee={fees.totalFee}
+                />
+              )}
+
+              {/* Compliance Rules — shown when rules exist (Req 5.2, 5.3) */}
+              {countryInfo && countryInfo.complianceRules.length > 0 && (
+                <div className="bg-card rounded-xl p-5 shadow-card border border-border/50 space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Transfer Requirements
+                  </h3>
+                  <ComplianceRulesList
+                    rules={countryInfo.complianceRules}
+                    onAllAcknowledged={setAllRulesAcknowledged}
+                  />
+                </div>
+              )}
+
+              {/* Acknowledgement required message (Req 5.4) */}
+              {countryInfo && countryInfo.complianceRules.length > 0 && !allRulesAcknowledged && (
+                <p className="text-sm text-amber-600 dark:text-amber-400 text-center">
+                  Please acknowledge all transfer requirements to continue
+                </p>
+              )}
+
               {submissionError && (
                 <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {submissionError}
@@ -1065,7 +1146,10 @@ export default function SendMoney() {
                   className="w-full"
                   onClick={handleConfirmSend}
                   disabled={
-                    isProcessing || Boolean(amountError) || isNetworkOffline
+                    isProcessing ||
+                    Boolean(amountError) ||
+                    isNetworkOffline ||
+                    (Boolean(countryInfo?.complianceRules.length) && !allRulesAcknowledged)
                   }
                 >
                   {isProcessing ? (
