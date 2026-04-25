@@ -1,54 +1,22 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ContactItem } from "@/components/ContactItem";
-import { FeeBreakdown } from "@/components/FeeBreakdown";
-import { BottomNav } from "@/components/BottomNav";
-import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
-import TransactionSigningDialog from "@/components/TransactionSigning";
-import { CompliancePreCheck } from "@/components/ComplianceCheck";
-import { TransferErrorDisplay } from "@/components/TransferErrorDisplay";
-import { CountryInfoPanel } from "@/components/CountryInfoPanel";
-import { CurrencyHint } from "@/components/CurrencyHint";
-import { CountrySummary } from "@/components/CountrySummary";
-import { ComplianceRulesList } from "@/components/ComplianceRulesList";
-import { useAuth } from "@/contexts/AuthContext";
-import { useWallet } from "@/contexts/WalletContext";
-import { useCompliance } from "@/contexts/ComplianceContext";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { useCountryInfo } from "@/hooks/useCountryInfo";
-import { createTransfer, checkTransferQueueStatus } from "@/lib/transfers";
-import { parseTransferError, TransferError } from "@/lib/errorHandling";
-import { transferLogger } from "@/lib/transferLogger";
-import { formatDeliveryEstimate } from "@/lib/countryTransferHelpers";
-import { contacts } from "@/data/mockData";
-import { Contact, TransactionPreview } from "@/types";
-import type { CashOutMethod } from "@/types/countryTransfer";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Search,
-  DollarSign,
-  Send,
-  CheckCircle2,
-  UserPlus,
-  Mail,
-  Phone,
-  MessageCircle,
-  Shield,
-  Zap,
-  Globe2,
-  Star,
-  Wallet,
-  MapPin,
-  AlertTriangle,
-  CloudOff,
-} from "lucide-react";
-import { toast } from "sonner";
+import { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ContactItem } from '@/components/ContactItem';
+import { FeeBreakdown } from '@/components/FeeBreakdown';
+import { BottomNav } from '@/components/BottomNav';
+import TransactionSigningDialog from '@/components/TransactionSigning';
+import { CompliancePreCheck } from '@/components/ComplianceCheck';
+import { useAuth } from '@/contexts/AuthContext';
+import { useWallet } from '@/contexts/WalletContext';
+import { useCompliance } from '@/contexts/ComplianceContext';
+import { contacts, calculateFees } from '@/data/mockData';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
+import { Contact, TransactionPreview } from '@/types';
+import { ArrowLeft, ArrowRight, Search, DollarSign, Send, CheckCircle2, UserPlus, Mail, Phone, MessageCircle, Shield, Zap, Globe2, Star, Wallet, MapPin, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
-type Step = "recipient" | "amount" | "confirm" | "success" | "processing";
+type Step = 'recipient' | 'amount' | 'confirm' | 'success';
 
 interface NewRecipient {
   identifier: string; // email or phone
@@ -106,83 +74,22 @@ export default function SendMoney() {
   const [transactionPreview, setTransactionPreview] =
     useState<TransactionPreview | null>(null);
   const [useExternalWallet, setUseExternalWallet] = useState(false);
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
-  const [queueJobId, setQueueJobId] = useState<string | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { rates, convert } = useExchangeRate();
 
-  // Country info hook — derives countryCode from selected contact (Req 1.6)
-  const countryCode = selectedContact?.countryCode ?? null;
-  const { data: countryInfo, isLoading: countryInfoLoading, isError: countryInfoError } = useCountryInfo(countryCode);
+  const countryToCurrency: Record<string, string> = {
+    'MX': 'MXN',
+    'PH': 'PHP',
+    'GT': 'GTQ',
+    'SV': 'USD',
+  };
 
-  // New-recipient state for confirm step
-  const [allRulesAcknowledged, setAllRulesAcknowledged] = useState(false);
-  const [selectedCashOutMethod, setSelectedCashOutMethod] = useState<CashOutMethod | null>(null);
+  const getRecipientCurrency = (contact: Contact | null) => {
+    if (!contact) return 'USD';
+    return countryToCurrency[contact.countryCode] || 'USD';
+  };
 
-  // Auto-select first cash-out method when countryInfo loads
-  useEffect(() => {
-    if (countryInfo && countryInfo.cashOutMethods.length > 0) {
-      setSelectedCashOutMethod(countryInfo.cashOutMethods[0]);
-    } else {
-      setSelectedCashOutMethod(null);
-    }
-  }, [countryInfo]);
-
-  // Reset acknowledgement when countryInfo changes
-  useEffect(() => {
-    setAllRulesAcknowledged(false);
-  }, [countryInfo]);
-
-  // Poll queue status until transfer completes
-  useEffect(() => {
-    if (!queueJobId) {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-      return;
-    }
-
-    const pollStatus = async () => {
-      try {
-        const status = await checkTransferQueueStatus(queueJobId);
-        if (status.status === "completed") {
-          if (user?.usdcBalance !== undefined) {
-            updateBalance(Number((user.usdcBalance - amountValue).toFixed(2)));
-          }
-          void queryClient.invalidateQueries({ queryKey: ["activity"] });
-          void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-          setStep("success");
-          setQueueJobId(null);
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
-          toast.success("Transfer completed successfully!");
-        } else if (status.status === "failed") {
-          void queryClient.invalidateQueries({ queryKey: ["activity"] });
-          void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-          setSubmissionError(status.error || "Transfer failed in the queue");
-          setQueueJobId(null);
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
-          toast.error(status.error || "Transfer processing failed");
-        }
-      } catch (err: unknown) {
-        // Continue polling on error
-        console.error("Failed to check queue status:", err);
-      }
-    };
-
-    pollIntervalRef.current = setInterval(pollStatus, 1000);
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, [amountValue, queryClient, queueJobId, updateBalance, user?.usdcBalance]);
+  const recipientCurrency = useMemo(() => getRecipientCurrency(selectedContact), [selectedContact]);
+  const convertedAmount = useMemo(() => convert(amountValue, recipientCurrency), [amountValue, recipientCurrency, convert]);
 
   const filteredContacts = useMemo(
     () =>
@@ -789,18 +696,17 @@ export default function SendMoney() {
                   </span>
                 </div>
 
-                {/* Currency Hint — shown inline below USDC label (Req 3.1, 3.2, 3.3) */}
-                {selectedContact && (
-                  <div className="mt-2">
-                    <CurrencyHint
-                      currencyCode={countryInfo?.currencyCode ?? null}
-                      exchangeRate={countryInfo?.exchangeRate ?? null}
-                      amount={amountValue}
-                      totalFee={fees.totalFee}
-                    />
+                {amountValue > 0 && recipientCurrency !== 'USD' && (
+                  <div className="flex items-center justify-center gap-2 mb-4 animate-fade-in">
+                    <p className="text-lg font-medium text-primary">
+                      ≈ {convertedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {recipientCurrency}
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      (1 USDC = {rates[recipientCurrency]?.toFixed(2)} {recipientCurrency})
+                    </span>
                   </div>
                 )}
-
+                
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm">
                   <p className="text-muted-foreground">
                     Available: ${user?.usdcBalance?.toFixed(2)} USDC
