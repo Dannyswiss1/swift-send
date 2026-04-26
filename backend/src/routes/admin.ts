@@ -21,6 +21,10 @@ interface SetRoleBody {
 export default async function adminRoutes(fastify: FastifyInstance) {
   const adminGuards = { preHandler: [requireVerifiedSession, requireRole('admin')] };
 
+  fastify.get('/admin/fees/analytics', adminGuards, async () => {
+    return fastify.container.services.activity.getAdminFeeAnalytics();
+  });
+
   /** GET /admin/rbac/status — view current Access Guard state */
   fastify.get('/admin/rbac/status', adminGuards, async (req) => {
     return fastify.container.services.accessGuard.getStatus();

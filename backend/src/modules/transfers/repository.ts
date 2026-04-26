@@ -6,6 +6,7 @@ export interface TransferRepository {
   save(record: TransferRecord): Promise<TransferRecord>;
   update(record: TransferRecord): Promise<TransferRecord>;
   listPending(): Promise<TransferRecord[]>;
+  listAll(): Promise<TransferRecord[]>;
   listByUserId(userId: string): Promise<TransferRecord[]>;
   listRecentByUserId(userId: string, limit?: number): Promise<TransferRecord[]>;
 }

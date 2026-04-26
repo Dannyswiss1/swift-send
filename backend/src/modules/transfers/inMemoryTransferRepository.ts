@@ -42,6 +42,12 @@ export class InMemoryTransferRepository implements TransferRepository {
       .map((record) => this.clone(record));
   }
 
+  async listAll() {
+    return Array.from(this.store.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((record) => this.clone(record));
+  }
+
   async listByUserId(userId: string) {
     return this.getIndexedRecords(userId);
   }

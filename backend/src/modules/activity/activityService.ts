@@ -73,6 +73,45 @@ export interface SpendingInsightsDto {
   }>;
 }
 
+export interface AdminFeeAnalyticsDto {
+  summary: {
+    totalTransfers: number;
+    settledTransfers: number;
+    pendingTransfers: number;
+    failedTransfers: number;
+    totalVolume: number;
+    totalFees: number;
+    totalServiceFees: number;
+    totalNetworkFees: number;
+    averageFeeRate: number;
+    thisMonthFees: number;
+    thisMonthVolume: number;
+  };
+  monthlyFees: Array<{
+    month: string;
+    volume: number;
+    fees: number;
+    transfers: number;
+  }>;
+  corridorFees: Array<{
+    corridor: string;
+    transfers: number;
+    volume: number;
+    fees: number;
+  }>;
+  recentTransfers: Array<{
+    id: string;
+    userId: string;
+    state: TransferRecord['state'];
+    amount: number;
+    fees: number;
+    serviceFee: number;
+    networkFee: number;
+    country?: string;
+    createdAt: string;
+  }>;
+}
+
 interface CacheEntry<T> {
   expiresAt: number;
   value: T;
@@ -231,6 +270,120 @@ export class ActivityService {
     });
 
     return insights;
+  }
+
+  async getAdminFeeAnalytics(): Promise<AdminFeeAnalyticsDto> {
+    const records = await this.repository.listAll();
+    const now = new Date();
+    const monthlyMap = new Map<string, { month: string; volume: number; fees: number; transfers: number }>();
+    const corridorMap = new Map<string, { corridor: string; volume: number; fees: number; transfers: number }>();
+
+    let totalVolume = 0;
+    let totalFees = 0;
+    let totalServiceFees = 0;
+    let totalNetworkFees = 0;
+    let settledTransfers = 0;
+    let pendingTransfers = 0;
+    let failedTransfers = 0;
+    let thisMonthFees = 0;
+    let thisMonthVolume = 0;
+
+    records.forEach((record) => {
+      const fees = getFees(record.metadata);
+      const recordDate = new Date(record.createdAt);
+      totalVolume += record.amount;
+      totalFees += fees.totalFee;
+      totalServiceFees += fees.serviceFee;
+      totalNetworkFees += fees.networkFee;
+
+      if (record.state === 'settled') {
+        settledTransfers += 1;
+      } else if (record.state === 'failed') {
+        failedTransfers += 1;
+      } else {
+        pendingTransfers += 1;
+      }
+
+      if (
+        recordDate.getUTCFullYear() === now.getUTCFullYear() &&
+        recordDate.getUTCMonth() === now.getUTCMonth()
+      ) {
+        thisMonthFees += fees.totalFee;
+        thisMonthVolume += record.amount;
+      }
+
+      const monthKey = `${recordDate.getUTCFullYear()}-${String(recordDate.getUTCMonth() + 1).padStart(2, '0')}`;
+      const monthEntry = monthlyMap.get(monthKey) || {
+        month: recordDate.toLocaleString('en-US', { month: 'short' }),
+        volume: 0,
+        fees: 0,
+        transfers: 0,
+      };
+      monthEntry.volume += record.amount;
+      monthEntry.fees += fees.totalFee;
+      monthEntry.transfers += 1;
+      monthlyMap.set(monthKey, monthEntry);
+
+      const corridorKey = record.recipient.country || 'Unknown';
+      const corridorEntry = corridorMap.get(corridorKey) || {
+        corridor: corridorKey,
+        volume: 0,
+        fees: 0,
+        transfers: 0,
+      };
+      corridorEntry.volume += record.amount;
+      corridorEntry.fees += fees.totalFee;
+      corridorEntry.transfers += 1;
+      corridorMap.set(corridorKey, corridorEntry);
+    });
+
+    return {
+      summary: {
+        totalTransfers: records.length,
+        settledTransfers,
+        pendingTransfers,
+        failedTransfers,
+        totalVolume: round2(totalVolume),
+        totalFees: round2(totalFees),
+        totalServiceFees: round2(totalServiceFees),
+        totalNetworkFees: round2(totalNetworkFees),
+        averageFeeRate: totalVolume > 0 ? round2((totalFees / totalVolume) * 100) : 0,
+        thisMonthFees: round2(thisMonthFees),
+        thisMonthVolume: round2(thisMonthVolume),
+      },
+      monthlyFees: Array.from(monthlyMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-6)
+        .map(([, entry]) => ({
+          month: entry.month,
+          volume: round2(entry.volume),
+          fees: round2(entry.fees),
+          transfers: entry.transfers,
+        })),
+      corridorFees: Array.from(corridorMap.values())
+        .sort((a, b) => b.fees - a.fees)
+        .slice(0, 6)
+        .map((entry) => ({
+          corridor: entry.corridor,
+          volume: round2(entry.volume),
+          fees: round2(entry.fees),
+          transfers: entry.transfers,
+        })),
+      recentTransfers: records.slice(0, 8).map((record) => {
+        const fees = getFees(record.metadata);
+        return {
+          id: record.id,
+          userId: record.userId,
+          state: record.state,
+          amount: round2(record.amount),
+          fees: fees.totalFee,
+          serviceFee: fees.serviceFee,
+          networkFee: fees.networkFee,
+          country: record.recipient.country,
+          createdAt: record.createdAt,
+        };
+      }),
+    };
   }
 
   async searchTransactions(

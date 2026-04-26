@@ -1,19 +1,5 @@
-import { FastifyInstance } from 'fastify';
 import { buildApp } from '../../app';
 import supertest from 'supertest';
-
-jest.mock('../../modules/transfers/requestSigning', () => ({
-  ...jest.requireActual('../../modules/transfers/requestSigning'),
-  verifySignedTransferPayload: jest.fn((payload, signature, secret) => {
-    const { ValidationError } = require('../../errors');
-    if (!signature) {
-      throw new ValidationError('transaction signature is required');
-    }
-    if (signature !== 'valid-signature-hash') {
-      throw new ValidationError('invalid transaction signature');
-    }
-  }),
-}));
 
 jest.mock('../../middleware/authenticate', () => ({
   requireVerifiedSession: jest.fn(async (req: any, reply: any) => {
@@ -36,8 +22,7 @@ jest.mock('../../auth/sessionStore', () => ({
     user: {
       id: 'user-1',
       walletAddress: 'wallet-1'
-    },
-    transactionSigningSecret: 'test-secret'
+    }
   }),
   getSessionUserBalance: jest.fn().mockReturnValue(1000)
 }));
@@ -56,7 +41,6 @@ describe('Transfer Routes', () => {
       type: 'wallet',
       wallet_public_key: 'GTEST123456789ABCDEF',
     },
-    signature: 'valid-signature-hash',
   };
 
   beforeAll(async () => {
@@ -76,8 +60,7 @@ describe('Transfer Routes', () => {
       // Mock authentication
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       const response = await request
@@ -98,28 +81,10 @@ describe('Transfer Routes', () => {
         .expect(401);
     });
 
-    it('should reject requests without signature', async () => {
-      const authToken = app.jwt.sign({ 
-        sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
-      });
-
-      const payloadWithoutSignature = { ...validTransferPayload };
-      delete (payloadWithoutSignature as any).signature;
-
-      await request
-        .post('/transfers')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(payloadWithoutSignature)
-        .expect(400);
-    });
-
     it('should reject invalid amounts', async () => {
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       const invalidPayload = {
@@ -137,8 +102,7 @@ describe('Transfer Routes', () => {
     it('should reject unsupported currencies', async () => {
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       const invalidPayload = {
@@ -156,8 +120,7 @@ describe('Transfer Routes', () => {
     it('should handle duplicate idempotency keys', async () => {
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       // First request
@@ -181,8 +144,7 @@ describe('Transfer Routes', () => {
     it('should validate recipient types', async () => {
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       const invalidRecipientPayload = {
@@ -203,8 +165,7 @@ describe('Transfer Routes', () => {
     it('should validate wallet recipient has public key', async () => {
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       const invalidWalletPayload = {
@@ -228,8 +189,7 @@ describe('Transfer Routes', () => {
     it('should return job status for valid job ID', async () => {
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       // First create a transfer
@@ -260,8 +220,7 @@ describe('Transfer Routes', () => {
     it('should return 404 for non-existent job ID', async () => {
       const authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
 
       await request
@@ -283,8 +242,7 @@ describe('Transfer Routes', () => {
     beforeEach(() => {
       authToken = app.jwt.sign({ 
         sub: 'user-1', 
-        verified: true,
-        transactionSigningSecret: 'test-secret'
+        verified: true
       });
     });
 

@@ -3,7 +3,7 @@ import { ValidationError } from '../errors';
 import { getSession, getSessionUserBalance } from '../auth/sessionStore';
 import type { JwtSessionPayload, Session } from '../auth/sessionTypes';
 import { CreateTransferCommand, TransferRecord } from '../modules/transfers/domain';
-import { canonicalizeSignedTransferPayload, verifySignedTransferPayload } from '../modules/transfers/requestSigning';
+import { canonicalizeSignedTransferPayload } from '../modules/transfers/requestSigning';
 import { requireVerifiedSession } from '../middleware/authenticate';
 import { requireAccessGuard } from '../middleware/requireRole';
 
@@ -13,7 +13,6 @@ interface TransferRequest {
   user_id?: string;
   amount: number;
   currency: string;
-  signature?: string;
   recipient: {
     type: 'wallet' | 'cash_pickup' | 'bank';
     wallet_public_key?: string;
@@ -62,7 +61,6 @@ export default async function transferRoutes(fastify: FastifyInstance) {
       const payload = requestPayloadForSigning(body);
       const session = requireTransferSession(req.user as JwtSessionPayload);
       verifySenderAuthenticity(body, session);
-      verifySignedTransferPayload(payload, body.signature, session.transactionSigningSecret);
 
       const command = mapRequestToCommand(body);
       fastify.container.services.transfers.validateCommand(command);

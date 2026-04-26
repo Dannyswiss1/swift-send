@@ -16,6 +16,11 @@ export interface PublicUser {
 
 export type UserRole = 'admin' | 'user';
 
+export interface SessionMetadata {
+  createdAt: number;
+  lastActivityAt: number;
+}
+
 export interface Session {
   id: string;
   email?: string;
@@ -23,9 +28,10 @@ export interface Session {
   verified: boolean;
   hasWallet: boolean;
   onboardingCompleted: boolean;
-  transactionSigningSecret: string;
   role?: UserRole;
   user?: PublicUser;
+  metadata: SessionMetadata;
+  expiresAt: number;
 }
 
 export interface JwtSessionPayload {
@@ -33,4 +39,12 @@ export interface JwtSessionPayload {
   verified: boolean;
   hasWallet: boolean;
   role?: UserRole;
+}
+
+export interface SessionInfo {
+  createdAt: number;
+  lastActivityAt: number;
+  expiresAt: number;
+  inactivityTimeoutMs: number;
+  warningThresholdMs: number;
 }

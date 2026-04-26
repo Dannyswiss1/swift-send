@@ -6,6 +6,7 @@ import {
   createNewUserSession,
   deleteSession,
   getSession,
+  getSessionInfo,
   isMariaIdentifier,
   saveSession,
 } from '../auth/sessionStore';
@@ -25,28 +26,23 @@ interface OnboardingBody {
   phone?: string;
 }
 
-function sessionToAuthUser(session: { id: string; email?: string; phone?: string; verified: boolean; hasWallet: boolean }) {
+function sessionToAuthUser(session: { id: string; email?: string; phone?: string; verified: boolean; hasWallet: boolean; role?: 'admin' | 'user' }) {
   return {
     id: session.id,
     email: session.email,
     phone: session.phone,
     isVerified: session.verified,
     hasWallet: session.hasWallet,
+    role: session.role ?? 'user',
   };
 }
 
-function sessionToTransactionSigning(session: { transactionSigningSecret: string }) {
-  return {
-    algorithm: 'HMAC-SHA-256',
-    secret: session.transactionSigningSecret,
-  };
-}
-
-async function setAuthCookie(reply: FastifyReply, session: { id: string; verified: boolean; hasWallet: boolean }) {
+async function setAuthCookie(reply: FastifyReply, session: { id: string; verified: boolean; hasWallet: boolean; role?: 'admin' | 'user' }) {
   const payload: JwtSessionPayload = {
     sub: session.id,
     verified: session.verified,
     hasWallet: session.hasWallet,
+    role: session.role ?? 'user',
   };
   const token = await reply.jwtSign(payload, { expiresIn: config.auth.jwtExpiresSeconds });
   reply.setCookie(config.auth.cookieName, token, {
@@ -89,7 +85,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         needsVerification: false,
         isNewUser: false,
         authUser: sessionToAuthUser(session),
-        transactionSigning: sessionToTransactionSigning(session),
+        session: getSessionInfo(session),
         user: session.user ?? null,
       });
     }
@@ -100,7 +96,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       needsVerification: true,
       isNewUser: true,
       authUser: sessionToAuthUser(session),
-      transactionSigning: sessionToTransactionSigning(session),
+      session: getSessionInfo(session),
       user: null,
     });
   });
@@ -117,7 +113,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     return reply.send({
       needsVerification: true,
       authUser: sessionToAuthUser(session),
-      transactionSigning: sessionToTransactionSigning(session),
+      session: getSessionInfo(session),
     });
   });
 
@@ -148,7 +144,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     return reply.send({
       authUser: sessionToAuthUser(session),
-      transactionSigning: sessionToTransactionSigning(session),
+      session: getSessionInfo(session),
       user: session.user ?? null,
       onboardingRequired: session.verified && !session.onboardingCompleted && !session.user,
     });
@@ -176,9 +172,23 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     return reply.send({
       authUser: sessionToAuthUser(session),
-      transactionSigning: sessionToTransactionSigning(session),
+      session: getSessionInfo(session),
       user: session.user ?? null,
       onboardingRequired: session.verified && !session.onboardingCompleted && !session.user,
+    });
+  });
+
+  fastify.post('/auth/session/heartbeat', { preHandler: [authenticate] }, async (request, reply) => {
+    const token = request.user as JwtSessionPayload;
+    const session = getSession(token.sub);
+    if (!session) {
+      clearAuthCookie(reply);
+      return reply.status(401).send({ error: 'Session expired' });
+    }
+
+    return reply.send({
+      session: getSessionInfo(session),
+      authUser: sessionToAuthUser(session),
     });
   });
 
@@ -216,6 +226,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     await setAuthCookie(reply, session);
 
-    return reply.send({ user: newUser, authUser: sessionToAuthUser(session), transactionSigning: sessionToTransactionSigning(session) });
+    return reply.send({
+      user: newUser,
+      authUser: sessionToAuthUser(session),
+      session: getSessionInfo(session),
+    });
   });
 }
