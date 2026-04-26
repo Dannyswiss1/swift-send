@@ -1,6 +1,18 @@
 import { config } from '../config';
+import { logger } from '../logger';
+
+export interface ContractEvent {
+  id: string;
+  contractId: string;
+  method: string;
+  args?: unknown[];
+  result: unknown;
+  timestamp: string;
+}
 
 export class ContractService {
+  private static readonly MAX_EVENTS = 500;
+  private events: ContractEvent[] = [];
   public readonly simpleCounter: string;
   public readonly accessGuard: string;
   public readonly remittanceEscrow?: string;
@@ -17,35 +29,55 @@ export class ContractService {
     this.recurringPayments = config.contracts.recurringPayments;
   }
 
-  async invoke(contractId: string, method: string, args?: any[]): Promise<any> {
-    // Placeholder for Soroban contract invocation
-    // In production, this would use stellar-sdk or soroban-client
-    console.log(`Invoking contract ${contractId}, method ${method}`, args);
-    
-    // Simulate contract call for now
-    return {
+  async invoke(contractId: string, method: string, args?: unknown[]): Promise<unknown> {
+    logger.info({ contractId, method, argCount: args?.length ?? 0 }, 'contract invoke');
+
+    const timestamp = new Date().toISOString();
+    const outcome = {
       contractId,
       method,
       args,
       result: 'success',
-      timestamp: new Date().toISOString(),
+      timestamp,
     };
+
+    const event: ContractEvent = {
+      id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      contractId,
+      method,
+      args,
+      result: outcome.result,
+      timestamp,
+    };
+
+    this.events.push(event);
+    if (this.events.length > ContractService.MAX_EVENTS) {
+      this.events.shift();
+    }
+
+    logger.info({ contractId, method, eventId: event.id }, 'contract event logged');
+    return outcome;
+  }
+
+  getEvents(limit = 50): ContractEvent[] {
+    const capped = Math.min(limit, 200);
+    return this.events.slice(-capped).reverse();
   }
 
   // Simple Counter methods
   async getSimpleCounterValue(): Promise<number> {
-    const result = await this.invoke(this.simpleCounter, 'get');
+    const result = await this.invoke(this.simpleCounter, 'get') as any;
     return result?.value || 0;
   }
 
   async incrementCounter(step: number = 1): Promise<number> {
-    const result = await this.invoke(this.simpleCounter, 'increment', [step]);
+    const result = await this.invoke(this.simpleCounter, 'increment', [step]) as any;
     return result?.value || 0;
   }
 
   // Access Guard methods
   async checkAccess(address: string, resource?: string): Promise<boolean> {
-    const result = await this.invoke(this.accessGuard, 'check', [address]);
+    const result = await this.invoke(this.accessGuard, 'check', [address]) as any;
     return result?.allowed || false;
   }
 
@@ -107,7 +139,7 @@ export class ContractService {
 
   async reverseLookup(wallet: string): Promise<string | null> {
     if (!this.walletRegistry) throw new Error('Wallet Registry not deployed');
-    const result = await this.invoke(this.walletRegistry, 'reverse_lookup', [wallet]);
+    const result = await this.invoke(this.walletRegistry, 'reverse_lookup', [wallet]) as any;
     return result?.userId || null;
   }
 

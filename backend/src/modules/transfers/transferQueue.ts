@@ -11,11 +11,23 @@ export interface QueuedTransferJob {
   completedAt?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
+  retries: number;
+}
+
+export interface QueueStats {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  queueLength: number;
+  totalTracked: number;
 }
 
 export class TransferQueue {
   private static readonly MAX_STORED_RESULTS = 200;
   private static readonly FINISHED_JOB_TTL_MS = 15 * 60 * 1000;
+  private static readonly MAX_JOB_RETRIES = 2;
+  private static readonly RETRY_DELAY_MS = 1000;
   private queue: QueuedTransferJob[] = [];
   private processing = false;
   private results = new Map<string, QueuedTransferJob>();
@@ -36,6 +48,7 @@ export class TransferQueue {
       command,
       createdAt: new Date().toISOString(),
       status: 'pending',
+      retries: 0,
     };
 
     this.queue.push(job);
@@ -87,21 +100,37 @@ export class TransferQueue {
             },
           });
         } catch (error: unknown) {
-          job.status = 'failed';
-          job.completedAt = new Date().toISOString();
           job.error = error instanceof Error ? error.message : 'Unknown error';
 
-          logger.error({ jobId: job.id, error }, 'transfer processing failed');
+          if (job.retries < TransferQueue.MAX_JOB_RETRIES) {
+            job.retries += 1;
+            job.status = 'pending';
+            job.startedAt = undefined;
+            logger.warn({ jobId: job.id, retries: job.retries, error: job.error }, 'transfer job retrying');
 
-          await this.eventBus.publish({
-            type: 'queue.transfer_failed',
-            timestamp: new Date().toISOString(),
-            payload: {
-              jobId: job.id,
-              transferId: job.command.idempotencyKey,
-              error: job.error,
-            },
-          });
+            // Re-enqueue after delay
+            const retryJob = { ...job };
+            setTimeout(() => {
+              this.queue.push(retryJob);
+              this.results.set(retryJob.id, retryJob);
+              void this.processQueue();
+            }, TransferQueue.RETRY_DELAY_MS * job.retries);
+          } else {
+            job.status = 'failed';
+            job.completedAt = new Date().toISOString();
+
+            logger.error({ jobId: job.id, retries: job.retries, error }, 'transfer processing failed after retries');
+
+            await this.eventBus.publish({
+              type: 'queue.transfer_failed',
+              timestamp: new Date().toISOString(),
+              payload: {
+                jobId: job.id,
+                transferId: job.command.idempotencyKey,
+                error: job.error,
+              },
+            });
+          }
         }
 
         this.queue.shift();
@@ -110,6 +139,18 @@ export class TransferQueue {
     } finally {
       this.processing = false;
     }
+  }
+
+  getQueueStats(): QueueStats {
+    const jobs = Array.from(this.results.values());
+    return {
+      pending: jobs.filter((j) => j.status === 'pending').length,
+      processing: jobs.filter((j) => j.status === 'processing').length,
+      completed: jobs.filter((j) => j.status === 'completed').length,
+      failed: jobs.filter((j) => j.status === 'failed').length,
+      queueLength: this.queue.length,
+      totalTracked: jobs.length,
+    };
   }
 
   private cleanupResults() {
