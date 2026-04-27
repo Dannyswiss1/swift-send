@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Zap, Shield, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Zap, Shield, CheckCircle2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface VerificationFormProps {
@@ -14,6 +14,8 @@ export default function VerificationForm({ onBack }: VerificationFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [countdown, setCountdown] = useState(30);
+  const [otpExpiry, setOtpExpiry] = useState(300); // 5 minutes OTP expiry
+  const [isOtpExpired, setIsOtpExpired] = useState(false);
   const { verifyCode, resendCode, authUser } = useAuth();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -29,6 +31,16 @@ export default function VerificationForm({ onBack }: VerificationFormProps) {
       return () => clearTimeout(timer);
     }
   }, [countdown]);
+
+  // OTP expiry countdown
+  useEffect(() => {
+    if (otpExpiry > 0) {
+      const timer = setTimeout(() => setOtpExpiry(otpExpiry - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsOtpExpired(true);
+    }
+  }, [otpExpiry]);
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) value = value.slice(-1);
@@ -58,6 +70,11 @@ export default function VerificationForm({ onBack }: VerificationFormProps) {
       return;
     }
 
+    if (isOtpExpired) {
+      toast.error('Verification code has expired. Please request a new code.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       await verifyCode(verificationCode);
@@ -76,6 +93,10 @@ export default function VerificationForm({ onBack }: VerificationFormProps) {
     try {
       await resendCode();
       setCountdown(30);
+      setOtpExpiry(300); // Reset OTP expiry to 5 minutes
+      setIsOtpExpired(false);
+      setCode(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
       toast.success('Verification code sent!');
     } catch (error) {
       toast.error('Failed to resend code. Please try again.');
@@ -135,6 +156,22 @@ export default function VerificationForm({ onBack }: VerificationFormProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* OTP Expiry Timer */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <div className={`text-sm font-medium ${isOtpExpired ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {isOtpExpired ? (
+                  <span className="flex items-center gap-1">
+                    ⚠️ Code expired
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    Expires in {Math.floor(otpExpiry / 60)}:{(otpExpiry % 60).toString().padStart(2, '0')}
+                  </span>
+                )}
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-foreground mb-3 text-center">
                 Enter verification code
@@ -150,11 +187,17 @@ export default function VerificationForm({ onBack }: VerificationFormProps) {
                     value={digit}
                     onChange={(e) => handleCodeChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
-                    className="w-12 h-12 text-center text-lg font-semibold"
+                    disabled={isOtpExpired}
+                    className={`w-12 h-12 text-center text-lg font-semibold ${isOtpExpired ? 'opacity-50 cursor-not-allowed' : ''}`}
                     autoFocus={index === 0}
                   />
                 ))}
               </div>
+              {isOtpExpired && (
+                <p className="text-xs text-red-600 text-center mt-2">
+                  Please request a new verification code
+                </p>
+              )}
             </div>
 
             <Button
@@ -162,7 +205,7 @@ export default function VerificationForm({ onBack }: VerificationFormProps) {
               variant="hero"
               size="lg"
               className="w-full"
-              disabled={isLoading || code.join('').length !== 6}
+              disabled={isLoading || code.join('').length !== 6 || isOtpExpired}
             >
               {isLoading ? (
                 <span className="animate-pulse-soft">Verifying...</span>
