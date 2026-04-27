@@ -72,6 +72,15 @@ export interface AuthUser {
   phone?: string;
   isVerified: boolean;
   hasWallet: boolean;
+  role: 'admin' | 'user';
+}
+
+export interface AuthSessionInfo {
+  createdAt: number;
+  lastActivityAt: number;
+  expiresAt: number;
+  inactivityTimeoutMs: number;
+  warningThresholdMs: number;
 }
 
 export interface Contact {

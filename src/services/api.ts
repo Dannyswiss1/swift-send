@@ -13,9 +13,15 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   if (init?.body !== undefined && typeof init.body === 'string' && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  return fetch(apiUrl(path), {
+  const response = await fetch(apiUrl(path), {
     ...init,
     credentials: 'include',
     headers,
   });
+
+  if (response.status === 401 && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('swiftsend:unauthorized'));
+  }
+
+  return response;
 }
