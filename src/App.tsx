@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { WalletProvider } from "./contexts/WalletContext";
 import { ComplianceProvider } from "./contexts/ComplianceContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -19,7 +20,7 @@ const History = lazy(() => import("./pages/History"));
 const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ComplianceInfo = lazy(() => import("./pages/ComplianceInfo"));
-const InsightsDashboard = lazy(() => import("./pages/InsightsDashboard"));
+const Refunds = lazy(() => import("./pages/Refunds"));
 const VerificationFlow = lazy(() =>
   import("./components/VerificationFlow").then((module) => ({
     default: module.VerificationFlow,
@@ -130,10 +131,10 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/insights"
+          path="/refunds"
           element={
             <ProtectedRoute>
-              <InsightsDashboard />
+              <Refunds />
             </ProtectedRoute>
           }
         />
@@ -146,18 +147,20 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <TooltipProvider>
-        <AuthProvider>
-          <WalletProvider>
-            <ComplianceProvider>
-              <SonnerToaster />
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            </ComplianceProvider>
-          </WalletProvider>
-        </AuthProvider>
-      </TooltipProvider>
+      <LanguageProvider>
+        <TooltipProvider>
+          <AuthProvider>
+            <WalletProvider>
+              <ComplianceProvider>
+                <SonnerToaster />
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              </ComplianceProvider>
+            </WalletProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </LanguageProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
