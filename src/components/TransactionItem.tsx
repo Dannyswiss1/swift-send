@@ -1,10 +1,10 @@
 import { memo } from 'react';
-import { ArrowUpRight, ArrowDownLeft, Phone, Receipt } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Phone, Receipt, Clock } from 'lucide-react';
 import { Transaction } from '@/types';
 import { StatusBadge } from './StatusBadge';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { splitFee } from '@/lib/fees';
 import { DownloadReceiptButton } from '@/components/DownloadReceiptButton';
 
@@ -18,6 +18,11 @@ interface TransactionItemProps {
 function TransactionItemComponent({ transaction, onClick, showDetailedView = false, senderName = '' }: TransactionItemProps) {
   const isSend = transaction.type === 'send';
   const feeSplit = splitFee(transaction.fee, { network: 0.1, service: 0.9 });
+  
+  // Timezone-aware timestamp formatting
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const formattedTimestamp = format(transaction.timestamp, 'PPp');
+  const relativeTime = formatDistanceToNow(transaction.timestamp, { addSuffix: true });
 
   return (
     <button
@@ -59,6 +64,12 @@ function TransactionItemComponent({ transaction, onClick, showDetailedView = fal
               <Phone className="w-3 h-3" />
               <span className="truncate">{transaction.recipientPhone}</span>
             </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              <span>{relativeTime}</span>
+            </div>
+          </div>
+          <div className="flex justify-end mt-1">
             <StatusBadge status={transaction.status} />
           </div>
         </div>
@@ -88,8 +99,10 @@ function TransactionItemComponent({ transaction, onClick, showDetailedView = fal
             <div>
               <p className="text-muted-foreground text-xs mb-1">Transaction Time</p>
               <p className="font-medium text-foreground">
-                {formatDistanceToNow(transaction.timestamp, { addSuffix: true })}
+                {relativeTime}
               </p>
+              <p className="text-xs text-muted-foreground mt-1">{formattedTimestamp}</p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">{userTimezone}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs mb-1">Transaction ID</p>
