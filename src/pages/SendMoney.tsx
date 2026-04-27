@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { createTransfer } from '@/services/transfers';
 import { formatDeliveryEstimate } from '@/lib/countryTransferHelpers';
 
-type Step = 'recipient' | 'amount' | 'confirm' | 'processing' | 'success';
+type Step = 'recipient' | 'amount' | 'confirm' | 'pin' | 'processing' | 'success';
 
 interface NewRecipient {
   identifier: string; // email or phone
@@ -90,6 +90,10 @@ export default function SendMoney() {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [queueJobId, setQueueJobId] = useState<string | null>(null);
   const [allRulesAcknowledged, setAllRulesAcknowledged] = useState(false);
+  const [pin, setPin] = useState(['', '', '', '']);
+  const [transactionPin, setTransactionPin] = useState<string | null>(null);
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const pinInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { rates, convert } = useExchangeRate();
   const { data: countryInfo, isLoading: countryInfoLoading, isError: countryInfoError } = useCountryInfo(selectedContact?.countryCode ?? null);
 
@@ -198,6 +202,12 @@ export default function SendMoney() {
     setStep("confirm");
   }, [amountError]);
 
+  const handleResetPin = useCallback(() => {
+    setTransactionPin(null);
+    setPin(['', '', '', '']);
+    toast.success('PIN has been reset. Please set a new PIN.');
+  }, []);
+
   const handleConfirmSend = async () => {
     if (isProcessing || showWalletSigning) {
       return;
@@ -212,6 +222,78 @@ export default function SendMoney() {
     if (amountError) {
       setSubmissionError(amountError);
       toast.error(amountError);
+      return;
+    }
+
+    // Check if PIN is set, if not, go to PIN setup
+    if (!transactionPin) {
+      setStep("pin");
+      setShowPinSetup(true);
+      return;
+    }
+
+    // If PIN is set, go to PIN verification
+    setStep("pin");
+    setShowPinSetup(false);
+  };
+
+  const handlePinSubmit = useCallback(async () => {
+    const enteredPin = pin.join('');
+    if (enteredPin.length !== 4) {
+      toast.error('Please enter a complete 4-digit PIN');
+      return;
+    }
+    
+    // Verify PIN (in production, this would be verified against stored PIN)
+    if (transactionPin && enteredPin !== transactionPin) {
+      toast.error('Incorrect PIN. Please try again.');
+      setPin(['', '', '', '']);
+      pinInputRefs.current[0]?.focus();
+      return;
+    }
+    
+    // If no PIN is set yet, set this as the transaction PIN
+    if (!transactionPin) {
+      setTransactionPin(enteredPin);
+      toast.success('PIN set successfully');
+      setPin(['', '', '', '']);
+      // Now proceed with the actual transfer
+      await processTransfer();
+      return;
+    }
+    
+    // PIN verified, proceed with transfer
+    setSubmissionError(null);
+    await processTransfer();
+  }, [pin, transactionPin]);
+
+  const handlePinChange = (index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1);
+    
+    const newPin = [...pin];
+    newPin[index] = value;
+    setPin(newPin);
+
+    // Auto-focus next input
+    if (value && index < 3) {
+      pinInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !pin[index] && index > 0) {
+      pinInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const processTransfer = useCallback(async () => {
+    if (isProcessing || showWalletSigning) {
+      return;
+    }
+
+    if (isNetworkOffline) {
+      setSubmissionError(networkBlockingMessage);
+      toast.error(networkBlockingMessage);
       return;
     }
 
@@ -235,6 +317,7 @@ export default function SendMoney() {
     // Standard managed wallet transaction
     setIsProcessing(true);
     setSubmissionError(null);
+    setStep("processing");
 
     try {
       await submitTransfer();
@@ -244,10 +327,11 @@ export default function SendMoney() {
       const errorMessage = getErrorMessage(error);
       setSubmissionError(errorMessage);
       toast.error(errorMessage);
+      setStep("confirm");
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [isProcessing, showWalletSigning, isNetworkOffline, networkBlockingMessage, connectionState.isConnected, useExternalWallet, selectedContact, newRecipient, amount, submitTransfer]);
 
   const handleWalletTransactionSuccess = async (txHash: string) => {
     setShowWalletSigning(false);
@@ -1181,6 +1265,81 @@ export default function SendMoney() {
                 By confirming, you authorize this transfer from your personal
                 wallet
               </p>
+            </div>
+          )}
+
+          {/* Step 4: PIN Entry/Verification */}
+          {step === "pin" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Shield className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-bold text-foreground mb-2">
+                  {showPinSetup ? 'Set Your Transaction PIN' : 'Enter Your PIN'}
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  {showPinSetup 
+                    ? 'Create a 4-digit PIN to secure your transactions'
+                    : 'Enter your PIN to confirm this transfer'}
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-3 mb-6">
+                {pin.map((digit, index) => (
+                  <Input
+                    key={index}
+                    ref={(el) => (pinInputRefs.current[index] = el)}
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handlePinChange(index, e.target.value)}
+                    onKeyDown={(e) => handlePinKeyDown(index, e)}
+                    className="w-14 h-14 text-center text-2xl font-semibold"
+                    autoFocus={index === 0}
+                  />
+                ))}
+              </div>
+
+              {!showPinSetup && (
+                <button
+                  onClick={handleResetPin}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Forgot PIN? Reset it
+                </button>
+              )}
+
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full"
+                onClick={handlePinSubmit}
+                disabled={pin.join('').length !== 4}
+              >
+                {showPinSetup ? (
+                  <>
+                    Set PIN & Continue
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                ) : (
+                  <>
+                    Confirm Transfer
+                    <Send className="w-5 h-5" />
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => setStep("confirm")}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
             </div>
           )}
         </div>
